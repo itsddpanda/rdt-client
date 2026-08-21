@@ -1,42 +1,85 @@
-<div class="field">
-  <label class="label">Login username</label>
-  <div class="control">
-    <input class="input" type="text" minlength="1" [(ngModel)]="username" />
+<div class="profile-page fade-in">
+  <div class="page-header-card glass-panel">
+    <div class="header-text-group">
+      <h2 class="page-title">
+        <i class="fas fa-user-shield"></i>
+        <span>Account & Security</span>
+      </h2>
+      <p class="page-subtitle">Manage your local login username and password credentials.</p>
+    </div>
   </div>
-  <p class="help">
-    This is the username you use to login Real-Debrid Client. Only change this if you want to change the username.
-  </p>
-</div>
-<div class="field">
-  <label class="label">Login password</label>
-  <div class="control">
-    <input class="input" type="password" minlength="1" [(ngModel)]="password" />
-  </div>
-  <p class="help">
-    This is the password you use to login Real-Debrid Client. Only change this if you want to change the password.
-  </p>
-</div>
 
-<div class="field">
-  <div class="control">
-    @if (error !== null) {
-      <div class="notification is-danger is-light">Error saving: {{ error }}</div>
-    }
-  </div>
-</div>
+  <div class="glass-panel profile-card">
+    <div class="profile-card-header">
+      <div class="profile-avatar-circle">
+        <i class="fas fa-user-astronaut"></i>
+      </div>
+      <div>
+        <h3 class="profile-card-title">Credentials</h3>
+        <p class="profile-card-subtitle">Leave fields blank if you do not want to modify them.</p>
+      </div>
+    </div>
 
-<div class="field">
-  <div class="control">
-    @if (success) {
-      <div class="notification is-success is-light">Your profile has been updated</div>
-    }
-  </div>
-</div>
+    <div class="profile-form">
+      <div class="field">
+        <label class="label">New Username</label>
+        <div class="control has-icons-left">
+          <input
+            class="input"
+            type="text"
+            minlength="1"
+            [(ngModel)]="username"
+            placeholder="Enter new username"
+          />
+          <span class="icon is-small is-left">
+            <i class="fas fa-user"></i>
+          </span>
+        </div>
+        <p class="help">The username you use to log in to RDT-Client web UI.</p>
+      </div>
 
-<div class="field">
-  <div class="control">
-    <button class="button is-success" (click)="save()" [disabled]="saving" [ngClass]="{ 'is-loading': saving }">
-      Save Profile
-    </button>
+      <div class="field">
+        <label class="label">New Password</label>
+        <div class="control has-icons-left">
+          <input
+            class="input"
+            type="password"
+            minlength="1"
+            [(ngModel)]="password"
+            placeholder="Enter new password"
+          />
+          <span class="icon is-small is-left">
+            <i class="fas fa-lock"></i>
+          </span>
+        </div>
+        <p class="help">The password you use to log in to RDT-Client web UI.</p>
+      </div>
+
+      @if (error && error.length > 0) {
+        <div class="notification is-danger is-light">
+          <i class="fas fa-triangle-exclamation"></i>
+          <span>Error saving: {{ error }}</span>
+        </div>
+      }
+
+      @if (success) {
+        <div class="notification is-success is-light">
+          <i class="fas fa-circle-check"></i>
+          <span>Your account profile has been successfully updated!</span>
+        </div>
+      }
+
+      <div class="profile-actions">
+        <button
+          class="button is-success"
+          (click)="save()"
+          [disabled]="saving"
+          [ngClass]="{ 'is-loading': saving }"
+        >
+          <i class="fas fa-check"></i>
+          <span>Save Profile</span>
+        </button>
+      </div>
+    </div>
   </div>
 </div>

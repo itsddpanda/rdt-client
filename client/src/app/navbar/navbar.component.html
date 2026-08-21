@@ -1,66 +1,104 @@
-<nav class="navbar is-dark is-fixed-top" role="navigation" aria-label="main navigation">
-  <div class="navbar-brand">
-    <a class="navbar-item" routerLink="/">
-      <img src="assets/logo.png" />
-    </a>
+<nav class="app-navbar is-fixed-top" role="navigation" aria-label="main navigation">
+  <div class="navbar-inner">
+    <div class="navbar-brand">
+      <a class="navbar-logo" routerLink="/">
+        <img src="assets/logo.png" alt="RDT-Client" class="logo-img" />
+        <span class="logo-text">RDT<span class="logo-accent">Client</span></span>
+      </a>
 
-    <a
-      role="button"
-      class="navbar-burger burger"
-      aria-label="menu"
-      aria-expanded="false"
-      [class.is-active]="showMobileMenu"
-      (click)="showMobileMenu = !showMobileMenu"
-    >
-      <span aria-hidden="true"></span>
-      <span aria-hidden="true"></span>
-      <span aria-hidden="true"></span>
-    </a>
-  </div>
-
-  <div class="navbar-menu" [class.is-active]="showMobileMenu">
-    <div class="navbar-start">
-      <a class="navbar-item" routerLink="/">
-        <span class="icon">
-          <i class="fas fa-table" aria-hidden="true"></i>
-        </span>
-        <span>Torrents/NZBs</span>
-      </a>
-      <a class="navbar-item" routerLink="/add" [queryParams]="{ type: 'torrent' }">
-        <span class="icon">
-          <i class="fas fa-plus" aria-hidden="true"></i>
-        </span>
-        <span>Add Torrent/NZB</span>
-      </a>
-      <a class="navbar-item" routerLink="/settings">
-        <span class="icon">
-          <i class="fas fa-cog" aria-hidden="true"></i>
-        </span>
-        <span>Settings</span>
-      </a>
-      @if (profile) {
-        <a class="navbar-item" href="{{ providerLink }}" target="_blank" rel="noopener">
-          <span class="icon">
-            <i class="fas fa-euro-sign" aria-hidden="true"></i>
-          </span>
-          @if (profile.expiration) {
-            <span>Premium Status: {{ profile.expiration | date }}</span>
-          } @else {
-            <span class="no-premium">Not premium</span>
-          }
-        </a>
-      }
+      <button
+        type="button"
+        class="navbar-burger-btn"
+        aria-label="menu"
+        aria-expanded="false"
+        [class.is-active]="showMobileMenu"
+        (click)="showMobileMenu = !showMobileMenu"
+      >
+        <span aria-hidden="true"></span>
+        <span aria-hidden="true"></span>
+        <span aria-hidden="true"></span>
+      </button>
     </div>
 
-    <div class="navbar-end">
-      <div class="navbar-item has-dropdown is-hoverable">
-        <span class="navbar-link"> Account </span>
+    <div class="navbar-nav" [class.is-open]="showMobileMenu">
+      <div class="nav-links">
+        <a
+          class="nav-item"
+          routerLink="/"
+          routerLinkActive="is-active"
+          [routerLinkActiveOptions]="{ exact: true }"
+        >
+          <span class="nav-icon"><i class="fas fa-layer-group"></i></span>
+          <span>Torrents/NZBs</span>
+        </a>
+        <a
+          class="nav-item"
+          routerLink="/add"
+          [queryParams]="{ type: 'torrent' }"
+          routerLinkActive="is-active"
+        >
+          <span class="nav-icon"><i class="fas fa-plus-circle"></i></span>
+          <span>Add Torrent/NZB</span>
+        </a>
+        <a
+          class="nav-item"
+          routerLink="/settings"
+          routerLinkActive="is-active"
+        >
+          <span class="nav-icon"><i class="fas fa-sliders"></i></span>
+          <span>Settings</span>
+        </a>
+      </div>
 
-        <div class="navbar-dropdown is-right">
-          <a class="navbar-item" routerLink="profile"> Profile </a>
-          <a class="navbar-item" (click)="logout()"> Logout </a>
-          <hr class="navbar-divider" />
-          <a href="https://github.com/rogerfar/rdt-client" target="_blank" class="navbar-item">Version {{ version }}</a>
+      <div class="nav-meta">
+        @if (profile) {
+          <a class="nav-premium-link" [href]="providerLink" target="_blank" rel="noopener">
+            @if (profile.expiration) {
+              <div class="premium-pill" title="Subscription Active">
+                <i class="fas fa-gem"></i>
+                <span>Premium: {{ profile.expiration | date: "mediumDate" }}</span>
+              </div>
+            } @else {
+              <div class="no-premium-pill" title="No Active Subscription">
+                <i class="fas fa-exclamation-circle"></i>
+                <span>Not Premium</span>
+              </div>
+            }
+          </a>
+        }
+
+        <div class="account-dropdown-wrapper">
+          <button class="account-btn" type="button">
+            <span class="avatar-icon"><i class="fas fa-user-astronaut"></i></span>
+            <span class="account-label">Account</span>
+            <i class="fas fa-chevron-down caret-icon"></i>
+          </button>
+
+          <div class="account-menu">
+            <div class="account-menu-header">
+              <span class="account-username">{{ profile?.userName || 'User' }}</span>
+              <span class="account-provider">{{ profile?.provider || 'Debrid' }}</span>
+            </div>
+            <hr class="dropdown-divider" />
+            <a class="dropdown-item" routerLink="/profile">
+              <i class="fas fa-user-gear"></i>
+              <span>Profile Settings</span>
+            </a>
+            <a class="dropdown-item is-logout" (click)="logout()">
+              <i class="fas fa-arrow-right-from-bracket"></i>
+              <span>Logout</span>
+            </a>
+            <hr class="dropdown-divider" />
+            <a
+              href="https://github.com/rogerfar/rdt-client"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="dropdown-item is-version"
+            >
+              <i class="fab fa-github"></i>
+              <span>Version {{ version }}</span>
+            </a>
+          </div>
         </div>
       </div>
     </div>
@@ -73,13 +111,19 @@
   profile.latestVersion &&
   profile.currentVersion !== profile.latestVersion
 ) {
-  <div class="notification" [ngClass]="profile.isInsecure ? 'is-danger' : 'is-warning'">
-    @if (profile.isInsecure) {
-      <span> Your current version is insecure. </span>
-    }
-    <span>
-      Version {{ profile.latestVersion }} of RealDebrid Client was found. You are currently on version
-      {{ profile.currentVersion }}.
-    </span>
+  <div class="update-banner-wrapper">
+    <div class="notification" [ngClass]="profile.isInsecure ? 'is-danger' : 'is-warning'">
+      <div class="update-banner-content">
+        <i class="fas fa-bullhorn banner-icon"></i>
+        <div>
+          @if (profile.isInsecure) {
+            <strong>Security Warning: </strong><span>Your current version is insecure. </span>
+          }
+          <span>
+            Version <strong>{{ profile.latestVersion }}</strong> of RealDebrid Client is available (current: {{ profile.currentVersion }}).
+          </span>
+        </div>
+      </div>
+    </div>
   </div>
 }

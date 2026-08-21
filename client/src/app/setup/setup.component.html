@@ -1,193 +1,252 @@
-<section class="hero is-dark is-fullheight">
-  <div class="hero-body">
-    <div class="container">
-      <div class="columns is-centered">
-        <div class="column is-5-tablet is-5-desktop is-5-widescreen">
-          <img src="assets/logo.png" />
-          @if (step === 1) {
-            <div class="box">
-              <div class="notification is-primary">
-                Welcome to Real-Debrid Client. Please create your account by entering a username and password.
-              </div>
-              <form (ngSubmit)="setup()">
-                <div class="field">
-                  <label for="userName" class="label">Username</label>
-                  <div class="control has-icons-left">
-                    <input
-                      type="text"
-                      placeholder=""
-                      class="input"
-                      name="userName"
-                      id="userName"
-                      [(ngModel)]="userName"
-                      required
-                    />
-                    <span class="icon is-small is-left">
-                      <i class="fa fa-envelope"></i>
-                    </span>
-                  </div>
-                </div>
-                <div class="field">
-                  <label for="password" class="label">Password</label>
-                  <div class="control has-icons-left">
-                    <input
-                      type="password"
-                      class="input"
-                      required
-                      name="password"
-                      id="password"
-                      [(ngModel)]="password"
-                    />
-                    <span class="icon is-small is-left">
-                      <i class="fa fa-lock"></i>
-                    </span>
-                  </div>
-                </div>
-                <div class="field">
-                  <button class="button is-success" [ngClass]="{ 'is-loading': working }" [disabled]="working">
-                    Setup
-                  </button>
-                </div>
-                @if (error?.length > 0) {
-                  <div class="notification is-danger is-light">
-                    {{ error }}
-                  </div>
-                }
-              </form>
-            </div>
-          }
+<div class="setup-page-wrapper">
+  <div class="setup-ambient-glow"></div>
 
-          @if (step === 2) {
-            <div class="box">
-              <div class="notification is-primary">
-                To be able to use the Real-Debrid Client you need a premium subscription to download torrents.
-                <br /><br />
-                Not premium yet? You have the choice of 5 providers:
-                <br />
-                <a href="https://real-debrid.com/?id=1348683" target="_blank" rel="noopener"
-                  >Use this link to sign up to Real-Debrid.</a
-                >
-                <br />
-                <a href="https://alldebrid.com/?uid=2v91l&lang=en" target="_blank" rel="noopener"
-                  >Use this link to sign up to AllDebrid.</a
-                >
-                <br />
-                <a href="https://www.premiumize.me/" target="_blank" rel="noopener"
-                  >Use this link to sign up to Premiumize.</a
-                >
-                <br />
-                <a href="https://torbox.app/" target="_blank" rel="noopener">Use this link to sign up to TorBox.</a>
-                <br />
-                <a href="https://debrid-link.com/" target="_blank" rel="noopener"
-                  >Use this link to sign up to DebridLink.</a
-                >
-                <small>(Referal links)</small>
-              </div>
-              <div class="field">
-                <label class="label">Provider</label>
-                <div class="control select is-fullwidth">
-                  <select [(ngModel)]="provider">
-                    <option [ngValue]="0">Real-Debrid</option>
-                    <option [ngValue]="1">AllDebrid</option>
-                    <option [ngValue]="2">Premiumize</option>
-                    <option [ngValue]="3">TorBox</option>
-                    <option [ngValue]="4">DebridLink</option>
-                  </select>
-                </div>
-              </div>
-              <div class="field">
-                <label for="debrid-api-token" class="label">API Private Token</label>
-                <div class="control">
-                  <input
-                    type="text"
-                    placeholder=""
-                    class="input"
-                    name="token"
-                    id="debrid-api-token"
-                    [(ngModel)]="token"
-                    required
-                  />
-                </div>
-                @if (provider === 0) {
-                  <p class="help">
-                    You can find your API key here:
-                    <a href="https://real-debrid.com/apitoken" target="_blank" rel="noopener"
-                      >https://real-debrid.com/apitoken</a
-                    >.
-                  </p>
-                }
-                @if (provider === 1) {
-                  <p class="help">
-                    You can find your API key here:
-                    <a href="https://alldebrid.com/apikeys/" target="_blank" rel="noopener"
-                      >https://alldebrid.com/apikeys/</a
-                    >.
-                  </p>
-                }
-                @if (provider === 2) {
-                  <p class="help">
-                    You can find your API key here:
-                    <a href="https://www.premiumize.me/account" target="_blank" rel="noopener"
-                      >https://www.premiumize.me/account</a
-                    >.
-                  </p>
-                }
-                @if (provider === 3) {
-                  <p class="help">
-                    You can find your API key here:
-                    <a href="https://torbox.app/settings" target="_blank" rel="noopener">https://torbox.app/settings</a
-                    >.
-                  </p>
-                }
-                @if (provider === 4) {
-                  <p class="help">
-                    You can find your API key here:
-                    <a href="https://debrid-link.com/webapp/apikey" target="_blank" rel="noopener"
-                      >https://debrid-link.com/webapp/apikey</a
-                    >.
-                  </p>
-                }
-              </div>
-              <div class="field">
-                <button
-                  class="button is-success"
-                  (click)="setToken()"
-                  [ngClass]="{ 'is-loading': working }"
-                  [disabled]="working"
-                >
-                  Setup
-                </button>
-              </div>
-              @if (error?.length > 0) {
-                <div class="notification is-danger is-light">
-                  {{ error }}
-                </div>
-              }
-            </div>
-          }
+  <div class="setup-card-container fade-in">
+    <div class="setup-brand-header">
+      <img src="assets/logo.png" alt="RDT-Client" class="setup-logo" />
+      <h1 class="setup-title">RDT<span class="logo-accent">Client</span> Setup</h1>
+      <p class="setup-subtitle">Quick initial setup wizard</p>
+    </div>
 
-          @if (step === 3) {
-            <div class="box">
-              <div class="notification is-primary">
-                You are now connected to Real-Debrid! To setup Radarr or Sonarr, please following the instructions here:
-                <a href="https://github.com/rogerfar/rdt-client/" target="_blank" rel="noopener"
-                  >https://github.com/rogerfar/rdt-client/</a
-                >.
-              </div>
-              <div class="field">
-                <button
-                  class="button is-success"
-                  (click)="close()"
-                  [ngClass]="{ 'is-loading': working }"
-                  [disabled]="working"
-                >
-                  OK
-                </button>
-              </div>
-            </div>
-          }
-        </div>
+    <!-- Wizard Steps Indicator -->
+    <div class="wizard-steps-indicator glass-panel">
+      <div class="wizard-step" [class.is-active]="step === 1" [class.is-completed]="step > 1">
+        <div class="step-badge">1</div>
+        <span class="step-label">Account</span>
+      </div>
+      <div class="step-connector" [class.is-active]="step > 1"></div>
+      <div class="wizard-step" [class.is-active]="step === 2" [class.is-completed]="step > 2">
+        <div class="step-badge">2</div>
+        <span class="step-label">Provider</span>
+      </div>
+      <div class="step-connector" [class.is-active]="step > 2"></div>
+      <div class="wizard-step" [class.is-active]="step === 3" [class.is-completed]="step === 3">
+        <div class="step-badge">3</div>
+        <span class="step-label">Done</span>
       </div>
     </div>
+
+    <!-- STEP 1: Account Creation -->
+    @if (step === 1) {
+      <div class="glass-panel setup-card">
+        <div class="setup-card-header">
+          <h3>Create Admin Account</h3>
+          <p>Set up the administrator username and password for this client instance.</p>
+        </div>
+
+        <form (ngSubmit)="setup()" class="setup-form">
+          <div class="field">
+            <label for="userName" class="label">Username</label>
+            <div class="control has-icons-left">
+              <input
+                type="text"
+                class="input"
+                name="userName"
+                id="userName"
+                [(ngModel)]="userName"
+                placeholder="Choose username"
+                required
+              />
+              <span class="icon is-small is-left">
+                <i class="fas fa-user"></i>
+              </span>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="password" class="label">Password</label>
+            <div class="control has-icons-left">
+              <input
+                type="password"
+                class="input"
+                required
+                name="password"
+                id="password"
+                [(ngModel)]="password"
+                placeholder="Choose password"
+              />
+              <span class="icon is-small is-left">
+                <i class="fas fa-lock"></i>
+              </span>
+            </div>
+          </div>
+
+          @if (error?.length > 0) {
+            <div class="notification is-danger is-light">
+              <i class="fas fa-triangle-exclamation"></i>
+              <span>{{ error }}</span>
+            </div>
+          }
+
+          <div class="setup-actions">
+            <button
+              class="button is-primary is-fullwidth is-setup-btn"
+              type="submit"
+              [ngClass]="{ 'is-loading': working }"
+              [disabled]="working"
+            >
+              <span>Next: Configure Provider</span>
+              <i class="fas fa-arrow-right"></i>
+            </button>
+          </div>
+        </form>
+      </div>
+    }
+
+    <!-- STEP 2: Provider & API Token -->
+    @if (step === 2) {
+      <div class="glass-panel setup-card">
+        <div class="setup-card-header">
+          <h3>Debrid Provider Setup</h3>
+          <p>A premium debrid subscription is required to unrestrict torrents and download files.</p>
+        </div>
+
+        <div class="provider-info-box">
+          <span class="provider-info-title">Need a subscription? Supported providers:</span>
+          <div class="provider-links-grid">
+            <a href="https://real-debrid.com/?id=1348683" target="_blank" rel="noopener noreferrer" class="provider-chip">
+              <i class="fas fa-arrow-up-right-from-square"></i> Real-Debrid
+            </a>
+            <a href="https://alldebrid.com/?uid=2v91l&lang=en" target="_blank" rel="noopener noreferrer" class="provider-chip">
+              <i class="fas fa-arrow-up-right-from-square"></i> AllDebrid
+            </a>
+            <a href="https://www.premiumize.me/" target="_blank" rel="noopener noreferrer" class="provider-chip">
+              <i class="fas fa-arrow-up-right-from-square"></i> Premiumize
+            </a>
+            <a href="https://torbox.app/" target="_blank" rel="noopener noreferrer" class="provider-chip">
+              <i class="fas fa-arrow-up-right-from-square"></i> TorBox
+            </a>
+            <a href="https://debrid-link.com/" target="_blank" rel="noopener noreferrer" class="provider-chip">
+              <i class="fas fa-arrow-up-right-from-square"></i> DebridLink
+            </a>
+            <a href="https://www.deepbrid.com/" target="_blank" rel="noopener noreferrer" class="provider-chip">
+              <i class="fas fa-arrow-up-right-from-square"></i> Deepbrid
+            </a>
+          </div>
+        </div>
+
+        <div class="setup-form">
+          <div class="field">
+            <label class="label">Provider</label>
+            <div class="control select is-fullwidth">
+              <select [(ngModel)]="provider">
+                <option [ngValue]="0">Real-Debrid</option>
+                <option [ngValue]="1">AllDebrid</option>
+                <option [ngValue]="2">Premiumize</option>
+                <option [ngValue]="3">TorBox</option>
+                <option [ngValue]="4">DebridLink</option>
+                <option [ngValue]="5">Deepbrid</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="debrid-api-token" class="label">API Private Token / Key</label>
+            <div class="control has-icons-left">
+              <input
+                type="text"
+                class="input font-mono"
+                name="token"
+                id="debrid-api-token"
+                [(ngModel)]="token"
+                placeholder="Paste API token / key here"
+                required
+              />
+              <span class="icon is-small is-left">
+                <i class="fas fa-key"></i>
+              </span>
+            </div>
+
+            @if (provider === 0) {
+              <p class="help">
+                Get your API token at:
+                <a href="https://real-debrid.com/apitoken" target="_blank" rel="noopener noreferrer">real-debrid.com/apitoken</a>
+              </p>
+            }
+            @if (provider === 1) {
+              <p class="help">
+                Get your API key at:
+                <a href="https://alldebrid.com/apikeys/" target="_blank" rel="noopener noreferrer">alldebrid.com/apikeys</a>
+              </p>
+            }
+            @if (provider === 2) {
+              <p class="help">
+                Get your API key at:
+                <a href="https://www.premiumize.me/account" target="_blank" rel="noopener noreferrer">premiumize.me/account</a>
+              </p>
+            }
+            @if (provider === 3) {
+              <p class="help">
+                Get your API key at:
+                <a href="https://torbox.app/settings" target="_blank" rel="noopener noreferrer">torbox.app/settings</a>
+              </p>
+            }
+            @if (provider === 4) {
+              <p class="help">
+                Get your API key at:
+                <a href="https://debrid-link.com/webapp/apikey" target="_blank" rel="noopener noreferrer">debrid-link.com/webapp/apikey</a>
+              </p>
+            }
+            @if (provider === 5) {
+              <p class="help">
+                Get your API key at:
+                <a href="https://www.deepbrid.com/downloader" target="_blank" rel="noopener noreferrer">deepbrid.com/downloader</a>
+              </p>
+            }
+          </div>
+
+          @if (error?.length > 0) {
+            <div class="notification is-danger is-light">
+              <i class="fas fa-triangle-exclamation"></i>
+              <span>{{ error }}</span>
+            </div>
+          }
+
+          <div class="setup-actions">
+            <button
+              class="button is-primary is-fullwidth is-setup-btn"
+              (click)="setToken()"
+              [ngClass]="{ 'is-loading': working }"
+              [disabled]="working"
+            >
+              <span>Validate & Save Provider</span>
+              <i class="fas fa-check"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- STEP 3: Setup Complete -->
+    @if (step === 3) {
+      <div class="glass-panel setup-card setup-complete-card">
+        <div class="complete-icon">
+          <i class="fas fa-circle-check"></i>
+        </div>
+        <h3 class="complete-title">Connected Successfully!</h3>
+        <p class="complete-desc">
+          Your debrid provider is now linked. To connect with automation tools like Radarr, Sonarr, or Prowlarr, check the documentation.
+        </p>
+
+        <div class="docs-box">
+          <a href="https://github.com/rogerfar/rdt-client/" target="_blank" rel="noopener noreferrer" class="docs-link">
+            <i class="fab fa-github"></i>
+            <span>Read Integration Guides on GitHub</span>
+          </a>
+        </div>
+
+        <div class="setup-actions">
+          <button
+            class="button is-success is-fullwidth is-setup-btn"
+            (click)="close()"
+            [ngClass]="{ 'is-loading': working }"
+            [disabled]="working"
+          >
+            <span>Launch RDT-Client</span>
+            <i class="fas fa-rocket"></i>
+          </button>
+        </div>
+      </div>
+    }
   </div>
-</section>
+</div>

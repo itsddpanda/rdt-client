@@ -1,4 +1,4 @@
-﻿using System.IO.Abstractions;
+using System.IO.Abstractions;
 using System.Net;
 using System.Reflection;
 using Microsoft.AspNetCore.Authorization;
@@ -20,6 +20,7 @@ public static class DiConfig
     public const String RD_CLIENT = "RdClient";
     public const String TORBOX_CLIENT = "TorBoxClient";
     public const String TORBOX_CLIENT_SLOW = "TorBoxClientSlow";
+    public const String DEEPBRID_CLIENT = "DeepbridClient";
     public static readonly String UserAgent = $"rdt-client {Assembly.GetEntryAssembly()?.GetName().Version}";
 
     public static void RegisterRdtServices(this IServiceCollection services)
@@ -45,6 +46,7 @@ public static class DiConfig
         services.AddSingleton<Settings>();
         services.AddSingleton<ISettings>(serviceProvider => serviceProvider.GetRequiredService<Settings>());
         services.AddScoped<TorBoxDebridClient>();
+        services.AddScoped<DeepbridDebridClient>();
         services.AddScoped<Torrents>();
         services.AddScoped<TorrentRunner>();
         services.AddScoped<DebridLinkClient>();
@@ -91,6 +93,10 @@ public static class DiConfig
         services.AddHttpClient(TORBOX_CLIENT_SLOW)
                 .AddHttpMessageHandler<RateLimitHandler>()
                 .AddResilienceHandler("torbox_client_handler_slow", ConfigureResiliencePipeline);
+
+        services.AddHttpClient(DEEPBRID_CLIENT)
+                .AddHttpMessageHandler<RateLimitHandler>()
+                .AddResilienceHandler("deepbrid_client_handler", ConfigureResiliencePipeline);
     }
 
     private static void ConfigureResiliencePipeline(ResiliencePipelineBuilder<HttpResponseMessage> builder)

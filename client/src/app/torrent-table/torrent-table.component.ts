@@ -61,8 +61,96 @@ export class TorrentTableComponent implements OnInit, OnDestroy {
   public rateLimitStatus: RateLimitStatus | null = null;
 
   public isMobile = false;
+  public searchTerm = '';
+  public filterStatus = 'all';
   private mobileQuery: MediaQueryList;
   private mobileQueryListener: (e: MediaQueryListEvent) => void;
+
+  public get totalCount(): number {
+    return this.torrents.length;
+  }
+
+  public get activeCount(): number {
+    return this.torrents.filter((t) => {
+      const status = (t.statusText ?? getTorrentStatus(t)).toLowerCase();
+      return status.includes('downloading') || status.includes('extracting') || status.includes('unpacking') || status.includes('processing');
+    }).length;
+  }
+
+  public get completedCount(): number {
+    return this.torrents.filter((t) => {
+      const status = (t.statusText ?? getTorrentStatus(t)).toLowerCase();
+      return t.completed != null || status === 'finished' || status.includes('downloaded to host') || status.includes('files unpacked');
+    }).length;
+  }
+
+  public get errorCount(): number {
+    return this.torrents.filter((t) => {
+      return !!t.error || t.rdStatus === 99;
+    }).length;
+  }
+
+  public get displayTorrents(): Torrent[] {
+    let list = this.sortedTorrents;
+
+    if (this.filterStatus !== 'all') {
+      if (this.filterStatus === 'active') {
+        list = list.filter((t) => {
+          const status = (t.statusText ?? getTorrentStatus(t)).toLowerCase();
+          return status.includes('downloading') || status.includes('extracting') || status.includes('unpacking') || status.includes('processing');
+        });
+      } else if (this.filterStatus === 'completed') {
+        list = list.filter((t) => {
+          const status = (t.statusText ?? getTorrentStatus(t)).toLowerCase();
+          return t.completed != null || status === 'finished' || status.includes('downloaded to host') || status.includes('files unpacked');
+        });
+      } else if (this.filterStatus === 'error') {
+        list = list.filter((t) => !!t.error || t.rdStatus === 99);
+      }
+    }
+
+    if (this.searchTerm && this.searchTerm.trim()) {
+      const term = this.searchTerm.trim().toLowerCase();
+      list = list.filter((t) => {
+        return (t.rdName && t.rdName.toLowerCase().includes(term)) ||
+               (t.category && t.category.toLowerCase().includes(term)) ||
+               (t.hash && t.hash.toLowerCase().includes(term));
+      });
+    }
+
+    return list;
+  }
+
+  public getStatusType(torrent: Torrent): string {
+    if (torrent.error || torrent.rdStatus === 99) {
+      return 'status-error';
+    }
+    const status = (torrent.statusText ?? getTorrentStatus(torrent)).toLowerCase();
+    if (torrent.completed != null || status === 'finished' || status.includes('downloaded to host') || status.includes('files unpacked')) {
+      return 'status-finished';
+    }
+    if (status.includes('downloading') || status.includes('extracting') || status.includes('unpacking') || status.includes('processing')) {
+      return 'status-downloading';
+    }
+    if (status.includes('queued') || status.includes('waiting')) {
+      return 'status-queued';
+    }
+    return 'status-warning';
+  }
+
+  public getStatusDotClass(torrent: Torrent): string {
+    if (torrent.error || torrent.rdStatus === 99) {
+      return 'dot-danger';
+    }
+    const status = (torrent.statusText ?? getTorrentStatus(torrent)).toLowerCase();
+    if (torrent.completed != null || status === 'finished' || status.includes('downloaded to host') || status.includes('files unpacked')) {
+      return 'dot-success';
+    }
+    if (status.includes('downloading') || status.includes('extracting') || status.includes('unpacking') || status.includes('processing')) {
+      return 'dot-active';
+    }
+    return 'dot-warning';
+  }
 
   ngOnInit(): void {
     this.mobileQuery = window.matchMedia('(max-width: 768px)');

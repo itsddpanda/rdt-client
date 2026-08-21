@@ -1,0 +1,84 @@
+.profile-page {
+  max-width: 680px;
+  margin: 0 auto;
+}
+
+.page-header-card {
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.25rem;
+
+  .page-title {
+    font-size: 1.35rem;
+    font-weight: 800;
+    color: var(--text-main);
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    margin-bottom: 0.25rem;
+
+    i {
+      color: var(--color-primary);
+    }
+  }
+
+  .page-subtitle {
+    color: var(--text-muted);
+    font-size: 0.88rem;
+    margin: 0;
+  }
+}
+
+.profile-card {
+  padding: 1.75rem !important;
+
+  .profile-card-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding-bottom: 1.25rem;
+    border-bottom: 1px solid var(--border-subtle);
+    margin-bottom: 1.5rem;
+
+    .profile-avatar-circle {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: var(--color-primary-light);
+      color: var(--color-primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.4rem;
+      border: 1px solid rgba(99, 102, 241, 0.3);
+    }
+
+    .profile-card-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--text-main);
+      margin: 0 0 0.2rem;
+    }
+
+    .profile-card-subtitle {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      margin: 0;
+    }
+  }
+
+  .profile-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+
+    .control.has-icons-left .icon {
+      color: var(--text-subtle);
+    }
+  }
+
+  .profile-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 0.5rem;
+  }
+}

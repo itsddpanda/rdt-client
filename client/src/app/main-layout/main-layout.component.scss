@@ -1,3 +1,24 @@
-.main-list {
-  padding-top: 6em;
+.app-main-layout {
+  min-height: 100vh;
+  padding-top: 5.5rem;
+  padding-bottom: 3rem;
+  width: 100%;
+}
+
+.app-container {
+  width: 100%;
+  max-width: 1440px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1.25rem;
+  padding-right: 1.25rem;
+
+  @media screen and (max-width: 768px) {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+}
+
+.app-content-wrapper {
+  width: 100%;
 }

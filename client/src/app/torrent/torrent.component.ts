@@ -13,12 +13,15 @@ import { DecodeURIPipe } from '../decode-uri.pipe';
 import { FileSizePipe } from '../filesize.pipe';
 import { EMPTY, distinctUntilChanged, map, switchMap, tap, catchError } from 'rxjs';
 
+import { RouterLink } from '@angular/router';
+
 @Component({
   selector: 'app-torrent',
   templateUrl: './torrent.component.html',
   styleUrls: ['./torrent.component.scss'],
   imports: [
     NgClass,
+    RouterLink,
     CdkCopyToClipboard,
     FormsModule,
     DatePipe,
@@ -39,10 +42,18 @@ export class TorrentComponent implements OnInit {
   public torrent: Torrent;
 
   public activeTab: number = 0;
+  public fileSearchTerm: string = '';
 
   public copied: boolean = false;
 
   public downloadExpanded: { [downloadId: string]: boolean } = {};
+
+  public get filteredFiles() {
+    if (!this.torrent?.files) return [];
+    if (!this.fileSearchTerm.trim()) return this.torrent.files;
+    const term = this.fileSearchTerm.trim().toLowerCase();
+    return this.torrent.files.filter((f) => f.path && f.path.toLowerCase().includes(term));
+  }
 
   public isDeleteModalActive: boolean;
   public deleteError: string;
