@@ -205,8 +205,23 @@ public class DeepbridDebridClient(
 
     public async Task<String> Unrestrict(Torrent torrent, String link)
     {
+        if (String.IsNullOrWhiteSpace(link))
+        {
+            return link;
+        }
+
         try
         {
+            if (link.Contains("deepbrid.com/mytorrents", StringComparison.OrdinalIgnoreCase))
+            {
+                var directLink = await ResolveDeepbridTorrentLink(link);
+                if (!String.IsNullOrWhiteSpace(directLink))
+                {
+                    Log($"Resolved Deepbrid torrent link to direct download URL: {directLink}", torrent);
+                    return directLink;
+                }
+            }
+
             var form = new Dictionary<String, String>
             {
                 { "link", link }
@@ -233,6 +248,40 @@ public class DeepbridDebridClient(
         }
 
         return link;
+    }
+
+    private async Task<String?> ResolveDeepbridTorrentLink(String link)
+    {
+        var apiKey = settings.Current.Provider.ApiKey;
+        if (String.IsNullOrWhiteSpace(apiKey))
+        {
+            return null;
+        }
+
+        var client = httpClientFactory.CreateClient(DiConfig.DEEPBRID_CLIENT);
+        client.Timeout = TimeSpan.FromSeconds(settings.Current.Provider.Timeout > 0 ? settings.Current.Provider.Timeout : 15);
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, link);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+
+        using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+
+        if (response.Headers.Location != null)
+        {
+            var loc = response.Headers.Location;
+            return loc.IsAbsoluteUri ? loc.ToString() : new Uri(new Uri(link), loc).ToString();
+        }
+
+        if (response.RequestMessage?.RequestUri != null)
+        {
+            var finalUri = response.RequestMessage.RequestUri.ToString();
+            if (!String.Equals(finalUri, link, StringComparison.OrdinalIgnoreCase))
+            {
+                return finalUri;
+            }
+        }
+
+        return null;
     }
 
     public async Task<Torrent> UpdateData(Torrent torrent, DebridClientTorrent? torrentClientTorrent)
@@ -416,15 +465,28 @@ public class DeepbridDebridClient(
         try
         {
             var uri = new Uri(download.Link);
-            var query = HttpUtility.ParseQueryString(uri.Query);
 
-            if (!String.IsNullOrWhiteSpace(query["file"]))
+            // 1. If it's a resolved direct link, extract the filename from the last path segment
+            var segment = HttpUtility.UrlDecode(uri.Segments.LastOrDefault()?.TrimEnd('/') ?? "");
+            if (!String.IsNullOrWhiteSpace(segment) && segment.Contains('.'))
             {
-                return Task.FromResult(query["file"]!);
+                return Task.FromResult(FileHelper.RemoveInvalidFileNameChars(segment));
             }
 
-            var segment = HttpUtility.UrlDecode(uri.Segments.LastOrDefault()?.TrimEnd('/') ?? "");
-            return Task.FromResult(segment);
+            // 2. If query param 'file' contains an actual file name with extension
+            var query = HttpUtility.ParseQueryString(uri.Query);
+            var fileParam = query["file"];
+            if (!String.IsNullOrWhiteSpace(fileParam) && fileParam.Contains('.'))
+            {
+                return Task.FromResult(FileHelper.RemoveInvalidFileNameChars(fileParam));
+            }
+
+            if (!String.IsNullOrWhiteSpace(segment))
+            {
+                return Task.FromResult(FileHelper.RemoveInvalidFileNameChars(segment));
+            }
+
+            return Task.FromResult("");
         }
         catch
         {

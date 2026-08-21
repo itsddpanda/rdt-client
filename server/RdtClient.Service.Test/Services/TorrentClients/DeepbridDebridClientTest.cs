@@ -362,6 +362,32 @@ public class DeepbridDebridClientTest
     }
 
     [Fact]
+    public async Task Unrestrict_WhenDeepbridTorrentLink_ResolvesRedirectLocation()
+    {
+        // Arrange
+        var redirectUrl = "https://n.myfast.link/n/dl/torrent/d26a4b0045/The.Invite.2026.1080p.WEBRip.x264.AAC5.1-YTS.GG+-+YTS.BZ.mp4";
+        var redirectResponse = new HttpResponseMessage(HttpStatusCode.Redirect)
+        {
+            Headers = { Location = new Uri(redirectUrl) }
+        };
+        var handler = new RecordingHttpMessageHandler(_ => redirectResponse);
+        var client = CreateClient(handler);
+
+        var torrent = new Torrent
+        {
+            RdId = "40910"
+        };
+
+        // Act
+        var result = await client.Unrestrict(torrent, "https://www.deepbrid.com/mytorrents?torrent=40910&file=blNlLL&opt=.jdeatme");
+
+        // Assert
+        Assert.Equal(redirectUrl, result);
+        Assert.Equal(HttpMethod.Get, handler.Request!.Method);
+        Assert.Equal("https://www.deepbrid.com/mytorrents?torrent=40910&file=blNlLL&opt=.jdeatme", handler.Request.RequestUri!.ToString());
+    }
+
+    [Fact]
     public async Task Unrestrict_GeneratesPremiumLink_ReturnsDirectLink()
     {
         // Arrange
@@ -441,14 +467,20 @@ public class DeepbridDebridClientTest
         {
             Link = "https://premium-dl.deepbrid.com/d/abc123xyz/sample-video.mp4"
         };
+        var downloadWithToken = new Download
+        {
+            Link = "https://www.deepbrid.com/mytorrents?torrent=14648&file=blNlLL&opt=.jdeatme"
+        };
 
         // Act
         var filename1 = await client.GetFileName(downloadWithParam);
         var filename2 = await client.GetFileName(downloadWithPath);
+        var filename3 = await client.GetFileName(downloadWithToken);
 
         // Assert
         Assert.Equal("test-movie.mkv", filename1);
         Assert.Equal("sample-video.mp4", filename2);
+        Assert.Equal("mytorrents", filename3); // Not the raw token without extension
     }
 
     [Fact]
