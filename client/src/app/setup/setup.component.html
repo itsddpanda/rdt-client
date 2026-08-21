@@ -119,6 +119,9 @@
             <a href="https://debrid-link.com/" target="_blank" rel="noopener noreferrer" class="provider-chip">
               <i class="fas fa-arrow-up-right-from-square"></i> DebridLink
             </a>
+            <a href="https://www.deepbrid.com/" target="_blank" rel="noopener noreferrer" class="provider-chip">
+              <i class="fas fa-arrow-up-right-from-square"></i> Deepbrid
+            </a>
           </div>
         </div>
 
@@ -132,6 +135,7 @@
                 <option [ngValue]="2">Premiumize</option>
                 <option [ngValue]="3">TorBox</option>
                 <option [ngValue]="4">DebridLink</option>
+                <option [ngValue]="5">Deepbrid</option>
               </select>
             </div>
           </div>
@@ -181,6 +185,12 @@
               <p class="help">
                 Get your API key at:
                 <a href="https://debrid-link.com/webapp/apikey" target="_blank" rel="noopener noreferrer">debrid-link.com/webapp/apikey</a>
+              </p>
+            }
+            @if (provider === 5) {
+              <p class="help">
+                Get your API key at:
+                <a href="https://www.deepbrid.com/downloader" target="_blank" rel="noopener noreferrer">deepbrid.com/downloader</a>
               </p>
             }
           </div>
