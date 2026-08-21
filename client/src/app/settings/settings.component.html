@@ -1,219 +1,305 @@
-<div class="tabs">
-  <ul>
-    @for (tab of tabs; track tab.key; let i = $index) {
-      <li [ngClass]="{ 'is-active': activeTab === i }" (click)="activeTab = i">
-        <a>{{ tab.displayName }}</a>
+<div class="settings-page fade-in">
+  <div class="page-header-card glass-panel">
+    <div class="header-text-group">
+      <h2 class="page-title">
+        <i class="fas fa-sliders"></i>
+        <span>Settings & Preferences</span>
+      </h2>
+      <p class="page-subtitle">Configure downloader clients, provider integrations, paths, and diagnostics.</p>
+    </div>
+  </div>
+
+  <!-- Settings Category Tabs -->
+  <div class="tabs settings-tabs">
+    <ul>
+      @for (tab of tabs; track tab.key; let i = $index) {
+        <li [class.is-active]="activeTab === i" (click)="activeTab = i">
+          <a>
+            <i class="fas" [ngClass]="{
+              'fa-gear': tab.key === 'General',
+              'fa-server': tab.key === 'Provider',
+              'fa-download': tab.key === 'DownloadClient',
+              'fa-link': tab.key === 'Symlink',
+              'fa-microchip': tab.key === 'Advanced' || tab.key === 'Host'
+            }"></i>
+            <span>{{ tab.displayName }}</span>
+          </a>
+        </li>
+      }
+      <li [class.is-active]="activeTab === 99" (click)="activeTab = 99">
+        <a>
+          <i class="fas fa-gauge-simple-high"></i>
+          <span>Speed & Diagnostics</span>
+        </a>
       </li>
-    }
-    <li [ngClass]="{ 'is-active': activeTab === 99 }" (click)="activeTab = 99">
-      <a>Speed Tests</a>
-    </li>
-  </ul>
-</div>
+    </ul>
+  </div>
 
-@for (tab of tabs; track tab.key; let i = $index) {
-  <div [hidden]="activeTab !== i">
-    <h3>{{ tab.description }}</h3>
-    @for (setting of tab.settings; track setting.key) {
-      @if (setting.type === "Object") {
-        <h3 class="title is-3" style="margin-top: 1.2rem">{{ setting.displayName }}</h3>
-      }
-      <div class="field">
-        @if (setting.type !== "Boolean" && setting.type !== "Object") {
-          <label class="label">{{ setting.displayName }}</label>
+  <!-- Regular Settings Tabs Content -->
+  @for (tab of tabs; track tab.key; let i = $index) {
+    <div [hidden]="activeTab !== i" class="tab-content-pane">
+      <div class="glass-panel settings-group-card">
+        @if (tab.description) {
+          <div class="group-desc-box">
+            <i class="fas fa-circle-info desc-icon"></i>
+            <p class="group-desc-text">{{ tab.description }}</p>
+          </div>
         }
-        @switch (setting.type) {
-          @case ("String") {
-            <div class="control">
-              <input class="input" type="text" [(ngModel)]="setting.value" />
-            </div>
+
+        <div class="settings-list">
+          @for (setting of tab.settings; track setting.key) {
+            @if (setting.type === "Object") {
+              <div class="settings-section-divider">
+                <h3 class="section-title">{{ setting.displayName }}</h3>
+              </div>
+            } @else {
+              <div class="setting-item-row" [class.is-boolean-row]="setting.type === 'Boolean'">
+                <div class="setting-item-header">
+                  <label class="setting-name">{{ setting.displayName }}</label>
+                  @if (setting.description) {
+                    <p class="setting-description" [innerHtml]="setting.description | nl2br"></p>
+                  }
+                </div>
+
+                <div class="setting-control-wrapper">
+                  @switch (setting.type) {
+                    @case ("String") {
+                      <input class="input font-mono" type="text" [(ngModel)]="setting.value" />
+                    }
+                    @case ("Int32") {
+                      <input class="input font-mono" type="number" [(ngModel)]="setting.value" />
+                    }
+                    @case ("Boolean") {
+                      <label class="switch-toggle">
+                        <input type="checkbox" [(ngModel)]="setting.value" />
+                        <span class="switch-slider"></span>
+                      </label>
+                    }
+                    @case ("Enum") {
+                      <div class="select is-fullwidth">
+                        <select [(ngModel)]="setting.value">
+                          @for (kvp of setting.enumValues | keyvalue; track kvp) {
+                            <option [value]="kvp.key">{{ kvp.value }}</option>
+                          }
+                        </select>
+                      </div>
+                    }
+                    @default {
+                      <div class="control">Invalid type {{ setting.type }}</div>
+                    }
+                  }
+
+                  @if (setting.key === "DownloadClient:Aria2cSecret") {
+                    <div class="aria-test-group">
+                      <button
+                        class="button is-warning is-small"
+                        (click)="testAria2cConnection()"
+                        [disabled]="saving"
+                        [ngClass]="{ 'is-loading': saving }"
+                      >
+                        <i class="fas fa-plug"></i>
+                        <span>Test Aria2 Connection</span>
+                      </button>
+
+                      @if (testAria2cConnectionError) {
+                        <div class="notification is-danger is-light">
+                          <i class="fas fa-triangle-exclamation"></i>
+                          <span>Could not connect: {{ testAria2cConnectionError }}</span>
+                        </div>
+                      }
+                      @if (testAria2cConnectionSuccess) {
+                        <div class="notification is-success is-light">
+                          <i class="fas fa-circle-check"></i>
+                          <span>Found Aria2 version: {{ testAria2cConnectionSuccess }}</span>
+                        </div>
+                      }
+                    </div>
+                  }
+                </div>
+              </div>
+            }
           }
-          @case ("Int32") {
-            <div class="control">
-              <input class="input" type="number" [(ngModel)]="setting.value" />
-            </div>
-          }
-          @case ("Boolean") {
-            <label class="checkbox">
-              <input type="checkbox" [(ngModel)]="setting.value" />
-              {{ setting.displayName }}
-            </label>
-          }
-          @case ("Enum") {
-            <div class="control select is-fullwidth">
-              <select [(ngModel)]="setting.value">
-                @for (kvp of setting.enumValues | keyvalue; track kvp) {
-                  <option [value]="kvp.key">{{ kvp.value }}</option>
+        </div>
+      </div>
+
+      <!-- Tab 0 Magnet Link Handler Helper -->
+      @if (activeTab === 0) {
+        <div class="glass-panel settings-group-card handler-card">
+          <div class="setting-item-row">
+            <div class="setting-item-header">
+              <label class="setting-name">Register Magnet Link Handler</label>
+              <p class="setting-description">
+                @if (canRegisterMagnetHandler) {
+                  Set RDT-Client as the default browser magnet link handler to automatically open clicked magnet links in the add torrent screen.
+                } @else {
+                  Magnet handler is unavailable in this browser or context (requires secure HTTPS or localhost).
                 }
-              </select>
+              </p>
             </div>
-          }
-          @case ("Object") {}
-          @default {
-            <div class="control">Invalid setting type {{ setting.type }}</div>
-          }
-        }
-        <p class="help" [innerHtml]="setting.description | nl2br"></p>
-        @if (setting.key === "DownloadClient:Aria2cSecret") {
-          <button
-            class="button is-warning"
-            (click)="testAria2cConnection()"
-            [disabled]="saving"
-            [ngClass]="{ 'is-loading': saving }"
-          >
-            Test aria2 connection
-          </button>
-          @if (testAria2cConnectionError) {
-            <div class="notification is-danger is-light" style="margin-top: 1rem">
-              Could connect to Aria2 client<br />
-              {{ testAria2cConnectionError }}
+            <div class="setting-control-wrapper">
+              <button
+                class="button is-info is-small"
+                type="button"
+                (click)="registerMagnetHandler()"
+                [disabled]="!canRegisterMagnetHandler"
+              >
+                <i class="fas fa-link"></i>
+                <span>{{ canRegisterMagnetHandler ? "Register Default Handler" : "Unavailable" }}</span>
+              </button>
             </div>
-          }
-          @if (testAria2cConnectionSuccess) {
-            <div class="notification is-success is-light" style="margin-top: 1rem">
-              Found Aria2 client version {{ testAria2cConnectionSuccess }}
-            </div>
-          }
-        }
-      </div>
-    }
-  </div>
-}
-
-@if (activeTab === 99) {
-  <div>
-    <div class="field">
-      <label class="label">Test download path permissions</label>
-      <div class="control">
-        @if (!testPathError && !testPathSuccess) {
-          <button
-            class="button is-warning"
-            (click)="testDownloadPath()"
-            [disabled]="saving"
-            [ngClass]="{ 'is-loading': saving }"
-          >
-            Test permissions
-          </button>
-        }
-        @if (testPathError) {
-          <div class="notification is-danger is-light">
-            Could not test your download path<br />
-            {{ testPathError }}
           </div>
-        }
-        @if (testPathSuccess) {
-          <div class="notification is-success is-light">Your download path looks good!</div>
-        }
-      </div>
-      <div class="help">This will check if the download folder has write permissions.</div>
-    </div>
-    <div class="field">
-      <label class="label">Test Real-Debrid download speed</label>
-      <div class="control">
-        @if (testDownloadSpeedError) {
-          <div class="notification is-danger is-light">
-            Could not test your download speed<br />
-            {{ testDownloadSpeedError }}
-          </div>
-        } @else if (testDownloadSpeedSuccess) {
-          <div class="notification is-success is-light">Download speed {{ testDownloadSpeedSuccess | filesize }}/s</div>
-        } @else {
-          <button
-            class="button is-warning"
-            (click)="testDownloadSpeed()"
-            [disabled]="saving"
-            [ngClass]="{ 'is-loading': saving }"
-          >
-            Test download speed
-          </button>
-        }
-      </div>
-      <div class="help">
-        This will attempt to download a 10GB file from Real-Debrid. When 50MB has been downloaded the test will stop.
-      </div>
-    </div>
-    <div class="field">
-      <label class="label">Test download folder write speed</label>
-      <div class="control">
-        @if (testWriteSpeedError) {
-          <div class="notification is-danger is-light">
-            Could not test your download speed<br />
-            {{ testWriteSpeedError }}
-          </div>
-        } @else if (testWriteSpeedSuccess) {
-          <div class="notification is-success is-light">Write speed {{ testWriteSpeedSuccess | filesize }}/s</div>
-        } @else {
-          <button
-            class="button is-warning"
-            (click)="testWriteSpeed()"
-            [disabled]="saving"
-            [ngClass]="{ 'is-loading': saving }"
-          >
-            Test write speed
-          </button>
-        }
-      </div>
-      <div class="help">This will write a small file to your download folder to see how fast it can write to it.</div>
-    </div>
-  </div>
-}
-
-<div class="field">
-  <div class="control">
-    @if (error?.length > 0) {
-      <div class="notification is-danger is-light">Error saving settings: {{ error }}</div>
-    }
-  </div>
-</div>
-
-@if (activeTab === 0) {
-  <div class="field">
-    <label class="label">Register client as magnet link handler</label>
-    <div class="control">
-      <button
-        class="button is-info"
-        type="button"
-        (click)="registerMagnetHandler()"
-        [disabled]="!canRegisterMagnetHandler"
-      >
-        <span>
-          {{ canRegisterMagnetHandler ? "Register Handler" : "Unavailable in This Browser" }}
-        </span>
-      </button>
-    </div>
-    <p class="help">
-      @if (canRegisterMagnetHandler) {
-        This will attempt to register the client as your browser's default handler for magnet links and automatically
-        open them in the new torrent screen for downloading.
-      } @else {
-        Magnet link registration is unavailable. Your
-        <a
-          href="https://caniuse.com/mdn-api_navigator_registerprotocolhandler"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          browser may not support this feature
-        </a>
-        , or the client is not being served in a
-        <a
-          href="https://developer.mozilla.org/en-US/docs/Glossary/Secure_Context/"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          secure context
-        </a>
-        .
+        </div>
       }
-    </p>
-  </div>
-}
+    </div>
+  }
 
-@if (activeTab < 99) {
-  <div class="field">
-    <div class="control">
-      <button class="button is-success" (click)="ok()" [disabled]="saving" [ngClass]="{ 'is-loading': saving }">
-        Save Settings
+  <!-- TAB 99: SPEED TESTS & DIAGNOSTICS -->
+  @if (activeTab === 99) {
+    <div class="tab-content-pane">
+      <div class="diagnostics-grid">
+        <!-- Diagnostic 1: Path Permissions -->
+        <div class="glass-panel diagnostic-card">
+          <div class="diagnostic-header">
+            <div class="diagnostic-icon is-primary">
+              <i class="fas fa-folder-check"></i>
+            </div>
+            <div class="diagnostic-title-group">
+              <h3>Download Path Permissions</h3>
+              <p>Verifies write permissions to the configured download directory.</p>
+            </div>
+          </div>
+
+          <div class="diagnostic-body">
+            @if (testPathError) {
+              <div class="notification is-danger is-light">
+                <i class="fas fa-triangle-exclamation"></i>
+                <span>Path error: {{ testPathError }}</span>
+              </div>
+            }
+            @if (testPathSuccess) {
+              <div class="notification is-success is-light">
+                <i class="fas fa-circle-check"></i>
+                <span>Download path is fully writable!</span>
+              </div>
+            }
+          </div>
+
+          <div class="diagnostic-footer">
+            <button
+              class="button is-primary is-small"
+              (click)="testDownloadPath()"
+              [disabled]="saving"
+              [ngClass]="{ 'is-loading': saving }"
+            >
+              <i class="fas fa-check"></i>
+              <span>Test Permissions</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Diagnostic 2: Debrid Download Speed -->
+        <div class="glass-panel diagnostic-card">
+          <div class="diagnostic-header">
+            <div class="diagnostic-icon is-info">
+              <i class="fas fa-bolt"></i>
+            </div>
+            <div class="diagnostic-title-group">
+              <h3>Provider Download Speed</h3>
+              <p>Tests connection throughput by fetching 50MB from your provider.</p>
+            </div>
+          </div>
+
+          <div class="diagnostic-body">
+            @if (testDownloadSpeedError) {
+              <div class="notification is-danger is-light">
+                <i class="fas fa-triangle-exclamation"></i>
+                <span>Speed test failed: {{ testDownloadSpeedError }}</span>
+              </div>
+            }
+            @if (testDownloadSpeedSuccess) {
+              <div class="diagnostic-metric-box">
+                <span class="metric-number font-mono">{{ testDownloadSpeedSuccess | filesize }}/s</span>
+                <span class="metric-tag">Download Speed</span>
+              </div>
+            }
+          </div>
+
+          <div class="diagnostic-footer">
+            <button
+              class="button is-info is-small"
+              (click)="testDownloadSpeed()"
+              [disabled]="saving"
+              [ngClass]="{ 'is-loading': saving }"
+            >
+              <i class="fas fa-play"></i>
+              <span>Run Speed Test</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Diagnostic 3: Disk Write Speed -->
+        <div class="glass-panel diagnostic-card">
+          <div class="diagnostic-header">
+            <div class="diagnostic-icon is-purple">
+              <i class="fas fa-hard-drive"></i>
+            </div>
+            <div class="diagnostic-title-group">
+              <h3>Disk Write Speed</h3>
+              <p>Measures local storage write throughput for download unpacks.</p>
+            </div>
+          </div>
+
+          <div class="diagnostic-body">
+            @if (testWriteSpeedError) {
+              <div class="notification is-danger is-light">
+                <i class="fas fa-triangle-exclamation"></i>
+                <span>Write test failed: {{ testWriteSpeedError }}</span>
+              </div>
+            }
+            @if (testWriteSpeedSuccess) {
+              <div class="diagnostic-metric-box">
+                <span class="metric-number font-mono">{{ testWriteSpeedSuccess | filesize }}/s</span>
+                <span class="metric-tag">Disk Write Speed</span>
+              </div>
+            }
+          </div>
+
+          <div class="diagnostic-footer">
+            <button
+              class="button is-warning is-small"
+              (click)="testWriteSpeed()"
+              [disabled]="saving"
+              [ngClass]="{ 'is-loading': saving }"
+            >
+              <i class="fas fa-play"></i>
+              <span>Run Write Test</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- Error Alerts -->
+  @if (error && error.length > 0) {
+    <div class="notification is-danger is-light" style="margin-top: 1rem">
+      <i class="fas fa-triangle-exclamation"></i>
+      <span>Error saving settings: {{ error }}</span>
+    </div>
+  }
+
+  <!-- Save Settings Action Button -->
+  @if (activeTab < 99) {
+    <div class="save-actions-bar">
+      <button
+        class="button is-success is-large-btn"
+        (click)="ok()"
+        [disabled]="saving"
+        [ngClass]="{ 'is-loading': saving }"
+      >
+        <i class="fas fa-check"></i>
+        <span>Save Settings</span>
       </button>
     </div>
-  </div>
-}
+  }
+</div>

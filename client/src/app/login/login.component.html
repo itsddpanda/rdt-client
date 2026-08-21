@@ -1,63 +1,72 @@
-<section class="hero is-dark is-fullheight">
-  <div class="hero-body">
-    <div class="container">
-      <div class="columns is-centered">
-        <div class="column is-5-tablet is-5-desktop is-5-widescreen">
-          <img src="assets/logo.png" />
-          <div class="box">
-            <form (ngSubmit)="login()">
-              <div class="field">
-                <label for="userName" class="label">Username</label>
-                <div class="control has-icons-left">
-                  <input
-                    type="text"
-                    placeholder=""
-                    class="input"
-                    name="userName"
-                    id="userName"
-                    (change)="setUserName($event)"
-                    required
-                  />
-                  <span class="icon is-small is-left">
-                    <i class="fa fa-envelope"></i>
-                  </span>
-                </div>
-              </div>
-              <div class="field">
-                <label for="password" class="label">Password</label>
-                <div class="control has-icons-left">
-                  <input
-                    type="password"
-                    class="input"
-                    required
-                    name="password"
-                    id="password"
-                    (change)="setPassword($event)"
-                  />
-                  <span class="icon is-small is-left">
-                    <i class="fa fa-lock"></i>
-                  </span>
-                </div>
-              </div>
-              <div class="field">
-                <button
-                  class="button is-success"
-                  type="submit"
-                  [ngClass]="{ 'is-loading': loggingIn }"
-                  [disabled]="loggingIn"
-                >
-                  Login
-                </button>
-              </div>
-              @if (error?.length > 0) {
-                <div class="notification is-danger is-light">
-                  {{ error }}
-                </div>
-              }
-            </form>
+<div class="auth-page-wrapper">
+  <div class="auth-ambient-glow"></div>
+
+  <div class="auth-card-container fade-in">
+    <div class="auth-brand-header">
+      <img src="assets/logo.png" alt="RDT-Client" class="auth-logo" />
+      <h1 class="auth-title">RDT<span class="logo-accent">Client</span></h1>
+      <p class="auth-subtitle">Sign in to manage your debrid downloads</p>
+    </div>
+
+    <div class="glass-panel auth-card">
+      <form (ngSubmit)="login()" class="auth-form">
+        <div class="field">
+          <label for="userName" class="label">Username</label>
+          <div class="control has-icons-left">
+            <input
+              type="text"
+              class="input"
+              name="userName"
+              id="userName"
+              placeholder="Enter your username"
+              (change)="setUserName($event)"
+              required
+              autocomplete="username"
+            />
+            <span class="icon is-small is-left">
+              <i class="fas fa-user"></i>
+            </span>
           </div>
         </div>
-      </div>
+
+        <div class="field">
+          <label for="password" class="label">Password</label>
+          <div class="control has-icons-left">
+            <input
+              type="password"
+              class="input"
+              required
+              name="password"
+              id="password"
+              placeholder="Enter your password"
+              (change)="setPassword($event)"
+              autocomplete="current-password"
+            />
+            <span class="icon is-small is-left">
+              <i class="fas fa-lock"></i>
+            </span>
+          </div>
+        </div>
+
+        @if (error?.length > 0) {
+          <div class="notification is-danger is-light">
+            <i class="fas fa-triangle-exclamation"></i>
+            <span>{{ error }}</span>
+          </div>
+        }
+
+        <div class="field auth-action-field">
+          <button
+            class="button is-primary is-fullwidth is-auth-btn"
+            type="submit"
+            [ngClass]="{ 'is-loading': loggingIn }"
+            [disabled]="loggingIn"
+          >
+            <i class="fas fa-arrow-right-to-bracket"></i>
+            <span>Sign In</span>
+          </button>
+        </div>
+      </form>
     </div>
   </div>
-</section>
+</div>
