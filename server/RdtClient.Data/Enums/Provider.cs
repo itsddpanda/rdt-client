@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 
 namespace RdtClient.Data.Enums;
 
@@ -17,5 +17,8 @@ public enum Provider
     TorBox,
 
     [Description("DebridLink")]
-    DebridLink
+    DebridLink,
+
+    [Description("Deepbrid")]
+    Deepbrid
 }

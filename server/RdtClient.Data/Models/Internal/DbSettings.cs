@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using RdtClient.Data.Enums;
 
@@ -189,12 +189,13 @@ http://127.0.0.1:6800/jsonrpc.")]
 public class DbSettingsProvider
 {
     [DisplayName("Provider")]
-    [Description(@"The following 4 providers are supported:
+    [Description(@"The following 6 providers are supported:
 <a href=""https://real-debrid.com/?id=1348683"" target=""_blank"" rel=""noopener"">https://real-debrid.com</a>
 <a href=""https://alldebrid.com/?uid=2v91l&lang=en"" target=""_blank"" rel=""noopener"">https://alldebrid.com</a>
 <a href=""https://www.premiumize.me/"" target=""_blank"" rel=""noopener"">https://www.premiumize.me/</a>
 <a href=""https://debrid-link.com/"" target=""_blank"" rel=""noopener"">https://debrid-link.com/</a>
 <a href=""https://torbox.app/"" target=""_blank"" rel=""noopener"">https://torbox.app/</a>
+<a href=""https://www.deepbrid.com/"" target=""_blank"" rel=""noopener"">https://www.deepbrid.com</a>
 At this point only 1 provider can be used at the time.")]
     public Provider Provider { get; set; } = Provider.RealDebrid;
 
@@ -208,7 +209,9 @@ or
 or
 <a href=""https://torbox.app/settings/"" target=""_blank"" rel=""noopener"">https://torbox.app/settings/</a>
 or
-<a href=""https://debrid-link.com/webapp/apikey"" target=""_blank"" rel=""noopener"">https://debrid-link.com/webapp/apikey</a>")]
+<a href=""https://debrid-link.com/webapp/apikey"" target=""_blank"" rel=""noopener"">https://debrid-link.com/webapp/apikey</a>
+or
+<a href=""https://www.deepbrid.com/devices"" target=""_blank"" rel=""noopener"">https://www.deepbrid.com/devices</a>")]
     public String ApiKey { get; set; } = "";
 
     /// <summary>

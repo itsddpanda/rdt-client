@@ -33,6 +33,7 @@ public class Torrents(
     RealDebridDebridClient realDebridDebridClient,
     DebridLinkClient debridLinkClient,
     TorBoxDebridClient torBoxDebridClient,
+    DeepbridDebridClient deepbridDebridClient,
     ISettings settings,
     ITorrentRunnerState runnerState)
 {
@@ -56,6 +57,7 @@ public class Torrents(
                 Provider.AllDebrid => allDebridDebridClient,
                 Provider.DebridLink => debridLinkClient,
                 Provider.TorBox => torBoxDebridClient,
+                Provider.Deepbrid => deepbridDebridClient,
                 _ => throw new("Invalid Provider")
             };
         }
