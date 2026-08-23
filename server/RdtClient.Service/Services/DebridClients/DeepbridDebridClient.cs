@@ -25,6 +25,20 @@ public class DeepbridDebridClient(
 {
     private const String BaseUrl = "https://www.deepbrid.com/api/v1/";
 
+    private static readonly SocketsHttpHandler NonRedirectingHandler = new()
+    {
+        AllowAutoRedirect = false,
+        PooledConnectionLifetime = TimeSpan.FromMinutes(2),
+        PooledConnectionIdleTimeout = TimeSpan.FromSeconds(30),
+        ConnectTimeout = TimeSpan.FromSeconds(15),
+        SslOptions = new System.Net.Security.SslClientAuthenticationOptions
+        {
+            RemoteCertificateValidationCallback = delegate { return true; }
+        }
+    };
+
+    private static readonly HttpMessageInvoker NonRedirectingInvoker = new(NonRedirectingHandler);
+
     public async Task<IList<DebridClientTorrent>> GetDownloads()
     {
         var results = new List<DebridClientTorrent>();
@@ -349,11 +363,13 @@ public class DeepbridDebridClient(
             if (link.Contains("deepbrid.com/mytorrents", StringComparison.OrdinalIgnoreCase))
             {
                 var directLink = await ResolveDeepbridTorrentLink(link);
-                if (!String.IsNullOrWhiteSpace(directLink))
+                if (!String.IsNullOrWhiteSpace(directLink) && !directLink.Contains("deepbrid.com/mytorrents", StringComparison.OrdinalIgnoreCase))
                 {
                     Log($"Resolved Deepbrid torrent link to direct download URL: {directLink}", torrent);
                     return directLink;
                 }
+
+                throw new InvalidOperationException($"Unable to resolve direct download link from Deepbrid for {link}");
             }
 
             var form = new Dictionary<String, String>
@@ -400,9 +416,6 @@ public class DeepbridDebridClient(
             return null;
         }
 
-        var client = httpClientFactory.CreateClient(DiConfig.DEEPBRID_CLIENT);
-        client.Timeout = TimeSpan.FromSeconds(settings.Current.Provider.Timeout > 0 ? settings.Current.Provider.Timeout : 15);
-
         var authenticatedLink = link;
         if (!link.Contains("apikey=", StringComparison.OrdinalIgnoreCase))
         {
@@ -411,27 +424,35 @@ public class DeepbridDebridClient(
         }
 
         using var request = new HttpRequestMessage(HttpMethod.Get, authenticatedLink);
+        request.Headers.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
 
-        using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+        using var response = await NonRedirectingInvoker.SendAsync(request, CancellationToken.None);
 
         if (response.Headers.Location != null)
         {
             var loc = response.Headers.Location;
-            return loc.IsAbsoluteUri ? loc.ToString() : new Uri(new Uri(authenticatedLink), loc).ToString();
-        }
-
-        if (response.RequestMessage?.RequestUri != null)
-        {
-            var finalUri = response.RequestMessage.RequestUri.ToString();
-            if (!String.Equals(finalUri, authenticatedLink, StringComparison.OrdinalIgnoreCase) &&
-                !String.Equals(finalUri, link, StringComparison.OrdinalIgnoreCase))
+            var resolvedUri = loc.IsAbsoluteUri ? loc.ToString() : new Uri(new Uri(authenticatedLink), loc).ToString();
+            if (!resolvedUri.Contains("deepbrid.com/mytorrents", StringComparison.OrdinalIgnoreCase))
             {
-                return finalUri;
+                return resolvedUri;
             }
         }
 
-        return authenticatedLink;
+        if (response.StatusCode is HttpStatusCode.MovedPermanently or HttpStatusCode.Found or HttpStatusCode.SeeOther or HttpStatusCode.TemporaryRedirect or (HttpStatusCode)308)
+        {
+            var loc = response.Headers.Location;
+            if (loc != null)
+            {
+                var resolvedUri = loc.IsAbsoluteUri ? loc.ToString() : new Uri(new Uri(authenticatedLink), loc).ToString();
+                if (!resolvedUri.Contains("deepbrid.com/mytorrents", StringComparison.OrdinalIgnoreCase))
+                {
+                    return resolvedUri;
+                }
+            }
+        }
+
+        return null;
     }
 
     public async Task<Torrent> UpdateData(Torrent torrent, DebridClientTorrent? torrentClientTorrent)
@@ -540,16 +561,58 @@ public class DeepbridDebridClient(
                 return null;
             }
 
-            var links = item.Links
-                            .Where(m => !String.IsNullOrWhiteSpace(m))
-                            .Select(l => new DownloadInfo
-                            {
-                                RestrictedLink = l,
-                                FileName = null
-                            })
-                            .ToList();
+            var validRawLinks = item.Links.Where(m => !String.IsNullOrWhiteSpace(m)).ToList();
+            var links = new List<DownloadInfo>();
 
-            Log($"Found {links.Count} download links for torrent {torrent.RdName}", torrent);
+            var tasks = validRawLinks.Select(async rawLink =>
+            {
+                try
+                {
+                    var resolved = await ResolveDeepbridTorrentLink(rawLink);
+                    if (String.IsNullOrWhiteSpace(resolved))
+                    {
+                        return null;
+                    }
+
+                    var decodedPath = HttpUtility.UrlDecode(new Uri(resolved).LocalPath);
+                    var fileName = Path.GetFileName(decodedPath);
+                    if (String.IsNullOrWhiteSpace(fileName) || fileName.Equals("mytorrents", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return null;
+                    }
+
+                    if (!fileFilter.IsDownloadable(torrent, fileName, Int64.MaxValue))
+                    {
+                        Log($"Excluded Deepbrid link {fileName} by filter rules", torrent);
+                        return null;
+                    }
+
+                    return new DownloadInfo
+                    {
+                        RestrictedLink = rawLink,
+                        FileName = fileName
+                    };
+                }
+                catch (Exception ex)
+                {
+                    logger.LogDebug(ex, "Skipping unresolved Deepbrid link {Link}: {Message}", rawLink, ex.Message);
+                    return null;
+                }
+            });
+
+            var resolvedList = await Task.WhenAll(tasks);
+            links.AddRange(resolvedList.Where(d => d != null)!);
+
+            if (links.Count == 0 && validRawLinks.Count > 0)
+            {
+                links = validRawLinks.Select(l => new DownloadInfo
+                {
+                    RestrictedLink = l,
+                    FileName = null
+                }).ToList();
+            }
+
+            Log($"Found {links.Count} downloadable files (out of {validRawLinks.Count} provider links) for torrent {torrent.RdName}", torrent);
             return links;
         }
 

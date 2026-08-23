@@ -1,4 +1,4 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text.Json;
 using Aria2NET;
@@ -19,7 +19,8 @@ public class TorrentRunner(
     IHttpClientFactory httpClientFactory,
     IRateLimitCoordinator coordinator,
     ISettings settings,
-    ITorrentRunnerState runnerState)
+    ITorrentRunnerState runnerState,
+    IDownloadableFileFilter? fileFilter = null)
 {
     public static readonly ITorrentRunnerState SharedState = new TorrentRunnerState();
 
@@ -525,6 +526,16 @@ public class TorrentRunner(
                             {
                                 var fileName = await torrents.RetrieveFileName(download.DownloadId);
                                 download.FileName = fileName;
+                            }
+
+                            if (fileFilter != null &&
+                                !String.IsNullOrWhiteSpace(download.FileName) &&
+                                !fileFilter.IsDownloadable(torrent, download.FileName, download.BytesTotal > 0 ? download.BytesTotal : Int64.MaxValue))
+                            {
+                                Log($"Skipping download because file {download.FileName} is excluded by filter rules", download, torrent);
+                                await downloads.UpdateCompleted(download.DownloadId, DateTimeOffset.UtcNow);
+                                download.Completed = DateTimeOffset.UtcNow;
+                                continue;
                             }
                         }
                     }
