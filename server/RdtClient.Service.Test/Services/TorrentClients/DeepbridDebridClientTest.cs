@@ -384,7 +384,7 @@ public class DeepbridDebridClientTest
         // Assert
         Assert.Equal(redirectUrl, result);
         Assert.Equal(HttpMethod.Get, handler.Request!.Method);
-        Assert.Equal("https://www.deepbrid.com/mytorrents?torrent=40910&file=blNlLL&opt=.jdeatme", handler.Request.RequestUri!.ToString());
+        Assert.Equal("https://www.deepbrid.com/mytorrents?torrent=40910&file=blNlLL&opt=.jdeatme&apikey=test-deepbrid-api-key", handler.Request.RequestUri!.ToString());
     }
 
     [Fact]
@@ -481,6 +481,107 @@ public class DeepbridDebridClientTest
         Assert.Equal("test-movie.mkv", filename1);
         Assert.Equal("sample-video.mp4", filename2);
         Assert.Equal("mytorrents", filename3); // Not the raw token without extension
+    }
+
+    [Fact]
+    public async Task Delete_Torrent_SendsHttpDeleteToTorrentsDelete()
+    {
+        // Arrange
+        var json = """{"error": 0, "message": "OK", "deleted": 1, "ids": [14648], "not_found": []}""";
+        var handler = new RecordingHttpMessageHandler(_ => JsonResponse(json));
+        var client = CreateClient(handler);
+
+        var torrent = new Torrent
+        {
+            RdId = "14648",
+            Type = DownloadType.Torrent
+        };
+
+        // Act
+        await client.Delete(torrent);
+
+        // Assert
+        Assert.NotNull(handler.Request);
+        Assert.Equal(HttpMethod.Delete, handler.Request.Method);
+        Assert.Equal("https://www.deepbrid.com/api/v1/torrents/delete/14648", handler.Request.RequestUri!.ToString());
+    }
+
+    [Fact]
+    public async Task Delete_Nzb_SendsHttpDeleteToUsenetUploadsDelete()
+    {
+        // Arrange
+        var json = """{"error": 0, "message": "OK", "deleted": 1, "ids": [1024], "not_found": []}""";
+        var handler = new RecordingHttpMessageHandler(_ => JsonResponse(json));
+        var client = CreateClient(handler);
+
+        var torrent = new Torrent
+        {
+            RdId = "1024",
+            Type = DownloadType.Nzb
+        };
+
+        // Act
+        await client.Delete(torrent);
+
+        // Assert
+        Assert.NotNull(handler.Request);
+        Assert.Equal(HttpMethod.Delete, handler.Request.Method);
+        Assert.Equal("https://www.deepbrid.com/api/v1/usenet/uploads/delete/1024", handler.Request.RequestUri!.ToString());
+    }
+
+    [Fact]
+    public async Task GetAllTorrents_WhenNoDataErrorCode1_ReturnsEmptyList()
+    {
+        // Arrange
+        var json = """{"error": 1, "message": "No torrents found"}""";
+        var handler = new RecordingHttpMessageHandler(_ => JsonResponse(json));
+        var client = CreateClient(handler);
+
+        // Act
+        var downloads = await client.GetDownloads();
+
+        // Assert
+        Assert.Empty(downloads);
+    }
+
+    [Fact]
+    public async Task AddTorrentMagnet_WhenAlreadyExists_RecoversIdFromExistingTorrents()
+    {
+        // Arrange
+        var existingTorrentsJson = """
+        {
+            "1": {
+                "id": "41498",
+                "filename": "Slow.Horses.S01.1080p.WEBRip.x265[eztv.re]",
+                "progress": 100,
+                "seeders": 0,
+                "speed": "0.00 MB/s",
+                "links": ["https://www.deepbrid.com/mytorrents?torrent=41498&file=abc"]
+            }
+        }
+        """;
+
+        var handler = new RecordingHttpMessageHandler(req =>
+        {
+            if (req.Method == HttpMethod.Post && req.RequestUri!.ToString().Contains("/torrents/add"))
+            {
+                // Deepbrid returns message indicating duplicate / no ID
+                return JsonResponse("""{"error": 1, "message": "Torrent already added"}""");
+            }
+            if (req.Method == HttpMethod.Get && req.RequestUri!.ToString().Contains("/torrents/info"))
+            {
+                return JsonResponse(existingTorrentsJson);
+            }
+            return JsonResponse("{}", HttpStatusCode.NotFound);
+        });
+
+        var client = CreateClient(handler);
+
+        // Act
+        var result = await client.AddTorrentMagnet("magnet:?xt=urn:btih:d26a4b0045&dn=Slow.Horses.S01.1080p.WEBRip.x265%5Beztv.re%5D");
+
+        // Assert
+        Assert.Equal("41498", result);
     }
 
     [Fact]
