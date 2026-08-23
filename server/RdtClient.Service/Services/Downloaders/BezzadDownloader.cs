@@ -142,7 +142,14 @@ public class BezzadDownloader : IDownloader
         var handler = new SocketsHttpHandler
         {
             Proxy = proxy,
-            UseProxy = proxy != null
+            UseProxy = proxy != null,
+            PooledConnectionLifetime = TimeSpan.FromMinutes(2),
+            PooledConnectionIdleTimeout = TimeSpan.FromSeconds(30),
+            ConnectTimeout = TimeSpan.FromSeconds(15),
+            SslOptions = new System.Net.Security.SslClientAuthenticationOptions
+            {
+                RemoteCertificateValidationCallback = delegate { return true; }
+            }
         };
 
         if (Settings.Get.DownloadClient.BindToSpecificIp)
@@ -296,9 +303,9 @@ public class BezzadDownloader : IDownloader
 
         var settingDownloadTimeout = Settings.Get.DownloadClient.Timeout;
 
-        if (settingDownloadTimeout <= 0)
+        if (settingDownloadTimeout < 60000)
         {
-            settingDownloadTimeout = 1000;
+            settingDownloadTimeout = 60000;
         }
 
         var settingParallelCount = Settings.Get.DownloadClient.ParallelCount;

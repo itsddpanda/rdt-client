@@ -25,6 +25,20 @@ public class DeepbridDebridClient(
 {
     private const String BaseUrl = "https://www.deepbrid.com/api/v1/";
 
+    private static readonly SocketsHttpHandler NonRedirectingHandler = new()
+    {
+        AllowAutoRedirect = false,
+        PooledConnectionLifetime = TimeSpan.FromMinutes(2),
+        PooledConnectionIdleTimeout = TimeSpan.FromSeconds(30),
+        ConnectTimeout = TimeSpan.FromSeconds(15),
+        SslOptions = new System.Net.Security.SslClientAuthenticationOptions
+        {
+            RemoteCertificateValidationCallback = delegate { return true; }
+        }
+    };
+
+    private static readonly HttpMessageInvoker NonRedirectingInvoker = new(NonRedirectingHandler);
+
     public async Task<IList<DebridClientTorrent>> GetDownloads()
     {
         var results = new List<DebridClientTorrent>();
@@ -102,19 +116,61 @@ public class DeepbridDebridClient(
             { "magnet", magnetLink }
         };
 
-        var json = await SendRequestAsync(HttpMethod.Post, "/torrents/add", new FormUrlEncodedContent(form));
-        using var doc = JsonDocument.Parse(json);
-        var root = doc.RootElement;
-
-        CheckForApiError(root);
-
-        var id = GetIdProperty(root);
-        if (String.IsNullOrWhiteSpace(id))
+        try
         {
-            throw new InvalidOperationException("Deepbrid API did not return torrent ID.");
+            var json = await SendRequestAsync(HttpMethod.Post, "/torrents/add", new FormUrlEncodedContent(form));
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            CheckForApiError(root);
+
+            var id = GetIdProperty(root);
+            if (!String.IsNullOrWhiteSpace(id))
+            {
+                return id;
+            }
+        }
+        catch (RateLimitException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            logger.LogDebug(ex, "AddTorrentMagnet direct add failed: {Message}. Attempting duplicate recovery from existing torrents list.", ex.Message);
         }
 
-        return id;
+        // Duplicate recovery: search existing torrents on Deepbrid
+        var existingTorrents = await GetAllTorrents();
+        if (existingTorrents != null && existingTorrents.Count > 0)
+        {
+            var hash = ExtractHashFromMagnet(magnetLink);
+            if (!String.IsNullOrWhiteSpace(hash))
+            {
+                var match = existingTorrents.FirstOrDefault(t =>
+                    String.Equals(t.Hash, hash, StringComparison.OrdinalIgnoreCase) ||
+                    (!String.IsNullOrWhiteSpace(t.Filename) && t.Filename.Contains(hash, StringComparison.OrdinalIgnoreCase)));
+
+                if (match != null && !String.IsNullOrWhiteSpace(match.Id))
+                {
+                    logger.LogInformation("Found existing torrent on Deepbrid with ID {Id} matching hash {Hash}", match.Id, hash);
+                    return match.Id;
+                }
+            }
+
+            var dn = ExtractDisplayNameFromMagnet(magnetLink);
+            if (!String.IsNullOrWhiteSpace(dn))
+            {
+                var match = existingTorrents.FirstOrDefault(t => IsMatchingTorrentName(t.Filename, dn));
+
+                if (match != null && !String.IsNullOrWhiteSpace(match.Id))
+                {
+                    logger.LogInformation("Found existing torrent on Deepbrid with ID {Id} matching name {Name} ({Filename})", match.Id, dn, match.Filename);
+                    return match.Id;
+                }
+            }
+        }
+
+        throw new InvalidOperationException("Deepbrid API did not return torrent ID.");
     }
 
     public async Task<String> AddTorrentFile(Byte[] bytes)
@@ -124,19 +180,41 @@ public class DeepbridDebridClient(
         fileContent.Headers.ContentType = MediaTypeHeaderValue.Parse("application/x-bittorrent");
         content.Add(fileContent, "torrent_file", "file.torrent");
 
-        var json = await SendRequestAsync(HttpMethod.Post, "/torrents/add", content);
-        using var doc = JsonDocument.Parse(json);
-        var root = doc.RootElement;
-
-        CheckForApiError(root);
-
-        var id = GetIdProperty(root);
-        if (String.IsNullOrWhiteSpace(id))
+        try
         {
-            throw new InvalidOperationException("Deepbrid API did not return torrent ID.");
+            var json = await SendRequestAsync(HttpMethod.Post, "/torrents/add", content);
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            CheckForApiError(root);
+
+            var id = GetIdProperty(root);
+            if (!String.IsNullOrWhiteSpace(id))
+            {
+                return id;
+            }
+        }
+        catch (RateLimitException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            logger.LogDebug(ex, "AddTorrentFile direct add failed: {Message}. Attempting duplicate recovery from existing torrents list.", ex.Message);
         }
 
-        return id;
+        var existingTorrents = await GetAllTorrents();
+        if (existingTorrents != null && existingTorrents.Count > 0)
+        {
+            var latest = existingTorrents.OrderByDescending(t => t.Added).FirstOrDefault();
+            if (latest != null && !String.IsNullOrWhiteSpace(latest.Id))
+            {
+                logger.LogInformation("Recovered latest torrent on Deepbrid with ID {Id} ({Filename})", latest.Id, latest.Filename);
+                return latest.Id;
+            }
+        }
+
+        throw new InvalidOperationException("Deepbrid API did not return torrent ID.");
     }
 
     public async Task<String> AddNzbLink(String nzbLink)
@@ -146,19 +224,40 @@ public class DeepbridDebridClient(
             { "nzb_url", nzbLink }
         };
 
-        var json = await SendRequestAsync(HttpMethod.Post, "/usenet/add", new FormUrlEncodedContent(form));
-        using var doc = JsonDocument.Parse(json);
-        var root = doc.RootElement;
-
-        CheckForApiError(root);
-
-        var id = GetIdProperty(root);
-        if (String.IsNullOrWhiteSpace(id))
+        try
         {
-            throw new InvalidOperationException("Deepbrid API did not return NZB ID.");
+            var json = await SendRequestAsync(HttpMethod.Post, "/usenet/add", new FormUrlEncodedContent(form));
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            CheckForApiError(root);
+
+            var id = GetIdProperty(root);
+            if (!String.IsNullOrWhiteSpace(id))
+            {
+                return id;
+            }
+        }
+        catch (RateLimitException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            logger.LogDebug(ex, "AddNzbLink direct add failed: {Message}. Attempting duplicate recovery from existing NZB list.", ex.Message);
         }
 
-        return id;
+        var existingUploads = await GetAllUsenetUploads();
+        if (existingUploads != null && existingUploads.Count > 0)
+        {
+            var latest = existingUploads.OrderByDescending(u => u.Added).FirstOrDefault();
+            if (latest != null && !String.IsNullOrWhiteSpace(latest.Id))
+            {
+                return latest.Id;
+            }
+        }
+
+        throw new InvalidOperationException("Deepbrid API did not return NZB ID.");
     }
 
     public async Task<String> AddNzbFile(Byte[] bytes, String? name)
@@ -170,19 +269,50 @@ public class DeepbridDebridClient(
         fileContent.Headers.ContentType = MediaTypeHeaderValue.Parse("application/x-nzb");
         content.Add(fileContent, "nzb_file", fileName);
 
-        var json = await SendRequestAsync(HttpMethod.Post, "/usenet/add", content);
-        using var doc = JsonDocument.Parse(json);
-        var root = doc.RootElement;
-
-        CheckForApiError(root);
-
-        var id = GetIdProperty(root);
-        if (String.IsNullOrWhiteSpace(id))
+        try
         {
-            throw new InvalidOperationException("Deepbrid API did not return NZB ID.");
+            var json = await SendRequestAsync(HttpMethod.Post, "/usenet/add", content);
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            CheckForApiError(root);
+
+            var id = GetIdProperty(root);
+            if (!String.IsNullOrWhiteSpace(id))
+            {
+                return id;
+            }
+        }
+        catch (RateLimitException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            logger.LogDebug(ex, "AddNzbFile direct add failed: {Message}. Attempting duplicate recovery from existing NZB list.", ex.Message);
         }
 
-        return id;
+        var existingUploads = await GetAllUsenetUploads();
+        if (existingUploads != null && existingUploads.Count > 0)
+        {
+            var match = existingUploads.FirstOrDefault(u =>
+                !String.IsNullOrWhiteSpace(u.Filename) &&
+                (String.Equals(u.Filename, fileName, StringComparison.OrdinalIgnoreCase) ||
+                 String.Equals(u.Filename, name, StringComparison.OrdinalIgnoreCase)));
+
+            if (match != null && !String.IsNullOrWhiteSpace(match.Id))
+            {
+                return match.Id;
+            }
+
+            var latest = existingUploads.OrderByDescending(u => u.Added).FirstOrDefault();
+            if (latest != null && !String.IsNullOrWhiteSpace(latest.Id))
+            {
+                return latest.Id;
+            }
+        }
+
+        throw new InvalidOperationException("Deepbrid API did not return NZB ID.");
     }
 
     public Task<IList<DebridClientAvailableFile>> GetAvailableFiles(String hash)
@@ -197,10 +327,26 @@ public class DeepbridDebridClient(
         return Task.FromResult<Int32?>(count);
     }
 
-    public Task Delete(Torrent torrent)
+    public async Task Delete(Torrent torrent)
     {
-        Log("Deepbrid API does not support remote torrent/NZB deletion; skipping delete", torrent);
-        return Task.CompletedTask;
+        if (String.IsNullOrWhiteSpace(torrent.RdId))
+        {
+            return;
+        }
+
+        try
+        {
+            var endpoint = torrent.Type == DownloadType.Nzb
+                ? $"/usenet/uploads/delete/{Uri.EscapeDataString(torrent.RdId)}"
+                : $"/torrents/delete/{Uri.EscapeDataString(torrent.RdId)}";
+
+            var json = await SendRequestAsync(HttpMethod.Delete, endpoint);
+            Log($"Deleted Deepbrid remote {torrent.Type} {torrent.RdId}: {json}", torrent);
+        }
+        catch (Exception ex)
+        {
+            logger.LogDebug(ex, "Failed to delete remote Deepbrid {Type} {Id}: {Message}", torrent.Type, torrent.RdId, ex.Message);
+        }
     }
 
     public async Task<String> Unrestrict(Torrent torrent, String link)
@@ -210,16 +356,20 @@ public class DeepbridDebridClient(
             return link;
         }
 
+        var apiKey = settings.Current.Provider.ApiKey;
+
         try
         {
             if (link.Contains("deepbrid.com/mytorrents", StringComparison.OrdinalIgnoreCase))
             {
                 var directLink = await ResolveDeepbridTorrentLink(link);
-                if (!String.IsNullOrWhiteSpace(directLink))
+                if (!String.IsNullOrWhiteSpace(directLink) && !directLink.Contains("deepbrid.com/mytorrents", StringComparison.OrdinalIgnoreCase))
                 {
                     Log($"Resolved Deepbrid torrent link to direct download URL: {directLink}", torrent);
                     return directLink;
                 }
+
+                throw new InvalidOperationException($"Unable to resolve direct download link from Deepbrid for {link}");
             }
 
             var form = new Dictionary<String, String>
@@ -247,6 +397,14 @@ public class DeepbridDebridClient(
             logger.LogDebug(ex, "Unrestrict failed for link {Link}, falling back to raw link: {Message}", link, ex.Message);
         }
 
+        if (!String.IsNullOrWhiteSpace(apiKey) &&
+            link.Contains("deepbrid.com", StringComparison.OrdinalIgnoreCase) &&
+            !link.Contains("apikey=", StringComparison.OrdinalIgnoreCase))
+        {
+            var separator = link.Contains('?') ? "&" : "?";
+            return $"{link}{separator}apikey={Uri.EscapeDataString(apiKey)}";
+        }
+
         return link;
     }
 
@@ -258,26 +416,39 @@ public class DeepbridDebridClient(
             return null;
         }
 
-        var client = httpClientFactory.CreateClient(DiConfig.DEEPBRID_CLIENT);
-        client.Timeout = TimeSpan.FromSeconds(settings.Current.Provider.Timeout > 0 ? settings.Current.Provider.Timeout : 15);
+        var authenticatedLink = link;
+        if (!link.Contains("apikey=", StringComparison.OrdinalIgnoreCase))
+        {
+            var separator = link.Contains('?') ? "&" : "?";
+            authenticatedLink = $"{link}{separator}apikey={Uri.EscapeDataString(apiKey)}";
+        }
 
-        using var request = new HttpRequestMessage(HttpMethod.Get, link);
+        using var request = new HttpRequestMessage(HttpMethod.Get, authenticatedLink);
+        request.Headers.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
 
-        using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+        using var response = await NonRedirectingInvoker.SendAsync(request, CancellationToken.None);
 
         if (response.Headers.Location != null)
         {
             var loc = response.Headers.Location;
-            return loc.IsAbsoluteUri ? loc.ToString() : new Uri(new Uri(link), loc).ToString();
+            var resolvedUri = loc.IsAbsoluteUri ? loc.ToString() : new Uri(new Uri(authenticatedLink), loc).ToString();
+            if (!resolvedUri.Contains("deepbrid.com/mytorrents", StringComparison.OrdinalIgnoreCase))
+            {
+                return resolvedUri;
+            }
         }
 
-        if (response.RequestMessage?.RequestUri != null)
+        if (response.StatusCode is HttpStatusCode.MovedPermanently or HttpStatusCode.Found or HttpStatusCode.SeeOther or HttpStatusCode.TemporaryRedirect or (HttpStatusCode)308)
         {
-            var finalUri = response.RequestMessage.RequestUri.ToString();
-            if (!String.Equals(finalUri, link, StringComparison.OrdinalIgnoreCase))
+            var loc = response.Headers.Location;
+            if (loc != null)
             {
-                return finalUri;
+                var resolvedUri = loc.IsAbsoluteUri ? loc.ToString() : new Uri(new Uri(authenticatedLink), loc).ToString();
+                if (!resolvedUri.Contains("deepbrid.com/mytorrents", StringComparison.OrdinalIgnoreCase))
+                {
+                    return resolvedUri;
+                }
             }
         }
 
@@ -390,16 +561,58 @@ public class DeepbridDebridClient(
                 return null;
             }
 
-            var links = item.Links
-                            .Where(m => !String.IsNullOrWhiteSpace(m))
-                            .Select(l => new DownloadInfo
-                            {
-                                RestrictedLink = l,
-                                FileName = null
-                            })
-                            .ToList();
+            var validRawLinks = item.Links.Where(m => !String.IsNullOrWhiteSpace(m)).ToList();
+            var links = new List<DownloadInfo>();
 
-            Log($"Found {links.Count} download links for torrent {torrent.RdName}", torrent);
+            var tasks = validRawLinks.Select(async rawLink =>
+            {
+                try
+                {
+                    var resolved = await ResolveDeepbridTorrentLink(rawLink);
+                    if (String.IsNullOrWhiteSpace(resolved))
+                    {
+                        return null;
+                    }
+
+                    var decodedPath = HttpUtility.UrlDecode(new Uri(resolved).LocalPath);
+                    var fileName = Path.GetFileName(decodedPath);
+                    if (String.IsNullOrWhiteSpace(fileName) || fileName.Equals("mytorrents", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return null;
+                    }
+
+                    if (!fileFilter.IsDownloadable(torrent, fileName, Int64.MaxValue))
+                    {
+                        Log($"Excluded Deepbrid link {fileName} by filter rules", torrent);
+                        return null;
+                    }
+
+                    return new DownloadInfo
+                    {
+                        RestrictedLink = rawLink,
+                        FileName = fileName
+                    };
+                }
+                catch (Exception ex)
+                {
+                    logger.LogDebug(ex, "Skipping unresolved Deepbrid link {Link}: {Message}", rawLink, ex.Message);
+                    return null;
+                }
+            });
+
+            var resolvedList = await Task.WhenAll(tasks);
+            links.AddRange(resolvedList.Where(d => d != null)!);
+
+            if (links.Count == 0 && validRawLinks.Count > 0)
+            {
+                links = validRawLinks.Select(l => new DownloadInfo
+                {
+                    RestrictedLink = l,
+                    FileName = null
+                }).ToList();
+            }
+
+            Log($"Found {links.Count} downloadable files (out of {validRawLinks.Count} provider links) for torrent {torrent.RdName}", torrent);
             return links;
         }
 
@@ -496,36 +709,58 @@ public class DeepbridDebridClient(
 
     private async Task<IList<DebridClientTorrent>?> GetAllTorrents()
     {
-        var json = await SendRequestAsync(HttpMethod.Get, "/torrents/info");
-        using var doc = JsonDocument.Parse(json);
-        var root = doc.RootElement;
-
-        CheckForApiError(root);
-
         var list = new List<DebridClientTorrent>();
 
-        if (root.ValueKind == JsonValueKind.Array)
+        try
         {
-            foreach (var elem in root.EnumerateArray())
+            var json = await SendRequestAsync(HttpMethod.Get, "/torrents/info");
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            if (root.ValueKind == JsonValueKind.Object && root.TryGetProperty("error", out var errProp))
             {
-                list.Add(MapTorrent(elem));
+                var code = errProp.ValueKind switch
+                {
+                    JsonValueKind.Number => errProp.GetInt32(),
+                    JsonValueKind.String when Int32.TryParse(errProp.GetString(), out var c) => c,
+                    _ => 0
+                };
+
+                if (code == 1)
+                {
+                    return list;
+                }
+            }
+
+            CheckForApiError(root);
+
+            if (root.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var elem in root.EnumerateArray())
+                {
+                    list.Add(MapTorrent(elem));
+                }
+            }
+            else if (root.ValueKind == JsonValueKind.Object)
+            {
+                foreach (var prop in root.EnumerateObject())
+                {
+                    if (prop.Value.ValueKind == JsonValueKind.Object &&
+                        (prop.Value.TryGetProperty("id", out _) || prop.Value.TryGetProperty("filename", out _)))
+                    {
+                        list.Add(MapTorrent(prop.Value));
+                    }
+                    else if (prop.Name == "id" && root.TryGetProperty("filename", out _))
+                    {
+                        list.Add(MapTorrent(root));
+                        break;
+                    }
+                }
             }
         }
-        else if (root.ValueKind == JsonValueKind.Object)
+        catch (Exception ex)
         {
-            foreach (var prop in root.EnumerateObject())
-            {
-                if (prop.Value.ValueKind == JsonValueKind.Object &&
-                    (prop.Value.TryGetProperty("id", out _) || prop.Value.TryGetProperty("filename", out _)))
-                {
-                    list.Add(MapTorrent(prop.Value));
-                }
-                else if (prop.Name == "id" && root.TryGetProperty("filename", out _))
-                {
-                    list.Add(MapTorrent(root));
-                    break;
-                }
-            }
+            logger.LogWarning(ex, "Failed to get torrents from Deepbrid: {Message}", ex.Message);
         }
 
         return list;
@@ -533,20 +768,42 @@ public class DeepbridDebridClient(
 
     private async Task<IList<DebridClientTorrent>?> GetAllUsenetUploads()
     {
-        var json = await SendRequestAsync(HttpMethod.Get, "/usenet/uploads");
-        using var doc = JsonDocument.Parse(json);
-        var root = doc.RootElement;
-
-        CheckForApiError(root);
-
         var list = new List<DebridClientTorrent>();
 
-        if (root.TryGetProperty("items", out var items) && items.ValueKind == JsonValueKind.Array)
+        try
         {
-            foreach (var item in items.EnumerateArray())
+            var json = await SendRequestAsync(HttpMethod.Get, "/usenet/uploads");
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            if (root.ValueKind == JsonValueKind.Object && root.TryGetProperty("error", out var errProp))
             {
-                list.Add(MapUsenet(item));
+                var code = errProp.ValueKind switch
+                {
+                    JsonValueKind.Number => errProp.GetInt32(),
+                    JsonValueKind.String when Int32.TryParse(errProp.GetString(), out var c) => c,
+                    _ => 0
+                };
+
+                if (code == 1)
+                {
+                    return list;
+                }
             }
+
+            CheckForApiError(root);
+
+            if (root.TryGetProperty("items", out var items) && items.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in items.EnumerateArray())
+                {
+                    list.Add(MapUsenet(item));
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to get Usenet uploads from Deepbrid: {Message}", ex.Message);
         }
 
         return list;
@@ -699,17 +956,133 @@ public class DeepbridDebridClient(
 
     private static String? GetIdProperty(JsonElement elem)
     {
-        if (elem.TryGetProperty("id", out var idProp))
+        if (elem.ValueKind == JsonValueKind.Object)
         {
-            return idProp.ValueKind switch
+            foreach (var name in new[] { "id", "torrent_id", "torrentId", "nzb_id", "nzbId", "torrent" })
             {
-                JsonValueKind.String => idProp.GetString(),
-                JsonValueKind.Number => idProp.GetInt64().ToString(),
-                _ => idProp.ToString()
-            };
+                if (elem.TryGetProperty(name, out var prop))
+                {
+                    var val = prop.ValueKind switch
+                    {
+                        JsonValueKind.String => prop.GetString(),
+                        JsonValueKind.Number => prop.GetInt64().ToString(),
+                        _ => prop.ToString()
+                    };
+
+                    if (!String.IsNullOrWhiteSpace(val))
+                    {
+                        return val;
+                    }
+                }
+            }
+
+            foreach (var container in new[] { "data", "item", "result" })
+            {
+                if (elem.TryGetProperty(container, out var containerProp) && containerProp.ValueKind == JsonValueKind.Object)
+                {
+                    var nestedId = GetIdProperty(containerProp);
+                    if (!String.IsNullOrWhiteSpace(nestedId))
+                    {
+                        return nestedId;
+                    }
+                }
+            }
+        }
+        else if (elem.ValueKind == JsonValueKind.String)
+        {
+            return elem.GetString();
+        }
+        else if (elem.ValueKind == JsonValueKind.Number)
+        {
+            return elem.GetInt64().ToString();
         }
 
         return null;
+    }
+
+    private static String? ExtractHashFromMagnet(String magnetLink)
+    {
+        if (String.IsNullOrWhiteSpace(magnetLink))
+        {
+            return null;
+        }
+
+        try
+        {
+            var match = System.Text.RegularExpressions.Regex.Match(magnetLink, @"xt=urn:btih:([a-zA-Z0-9]+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            if (match.Success)
+            {
+                return match.Groups[1].Value;
+            }
+        }
+        catch
+        {
+            // Ignore parse errors
+        }
+
+        return null;
+    }
+
+    private static String? ExtractDisplayNameFromMagnet(String magnetLink)
+    {
+        if (String.IsNullOrWhiteSpace(magnetLink))
+        {
+            return null;
+        }
+
+        try
+        {
+            var match = System.Text.RegularExpressions.Regex.Match(magnetLink, @"dn=([^&]+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            if (match.Success)
+            {
+                var raw = match.Groups[1].Value.Replace('+', ' ');
+                return HttpUtility.UrlDecode(raw);
+            }
+        }
+        catch
+        {
+            // Ignore parse errors
+        }
+
+        return null;
+    }
+
+    private static Boolean IsMatchingTorrentName(String? name1, String? name2)
+    {
+        if (String.IsNullOrWhiteSpace(name1) || String.IsNullOrWhiteSpace(name2))
+        {
+            return false;
+        }
+
+        var clean1 = System.Text.RegularExpressions.Regex.Replace(name1.ToLowerInvariant(), @"[^a-z0-9]", "");
+        var clean2 = System.Text.RegularExpressions.Regex.Replace(name2.ToLowerInvariant(), @"[^a-z0-9]", "");
+
+        if (clean1.Length > 3 && clean2.Length > 3)
+        {
+            if (clean1.Contains(clean2) || clean2.Contains(clean1))
+            {
+                return true;
+            }
+        }
+
+        var tokens1 = System.Text.RegularExpressions.Regex.Split(name1.ToLowerInvariant(), @"[^a-z0-9]+")
+                                                          .Where(t => t.Length > 1)
+                                                          .ToHashSet();
+        var tokens2 = System.Text.RegularExpressions.Regex.Split(name2.ToLowerInvariant(), @"[^a-z0-9]+")
+                                                          .Where(t => t.Length > 1)
+                                                          .ToHashSet();
+
+        if (tokens1.Count > 0 && tokens2.Count > 0)
+        {
+            var intersection = tokens1.Intersect(tokens2).Count();
+            var minCount = Math.Min(tokens1.Count, tokens2.Count);
+            if (minCount > 0 && (Double)intersection / minCount >= 0.7)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static void CheckForApiError(JsonElement root)

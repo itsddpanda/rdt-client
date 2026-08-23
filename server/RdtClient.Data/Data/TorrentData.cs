@@ -176,10 +176,12 @@ public class TorrentData(DataContext dataContext, ILogger<TorrentData>? logger =
             return;
         }
 
-        dbTorrent.DownloadClient = torrent.DownloadClient;
         dbTorrent.HostDownloadAction = torrent.HostDownloadAction;
         dbTorrent.Category = torrent.Category;
         dbTorrent.Priority = torrent.Priority;
+        dbTorrent.DownloadMinSize = torrent.DownloadMinSize;
+        dbTorrent.IncludeRegex = torrent.IncludeRegex;
+        dbTorrent.ExcludeRegex = torrent.ExcludeRegex;
         dbTorrent.DownloadRetryAttempts = torrent.DownloadRetryAttempts;
         dbTorrent.TorrentRetryAttempts = torrent.TorrentRetryAttempts;
         dbTorrent.DeleteOnError = torrent.DeleteOnError;
