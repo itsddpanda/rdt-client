@@ -25,19 +25,7 @@ public class DeepbridDebridClient(
 {
     private const String BaseUrl = "https://www.deepbrid.com/api/v1/";
 
-    private static readonly SocketsHttpHandler NonRedirectingHandler = new()
-    {
-        AllowAutoRedirect = false,
-        PooledConnectionLifetime = TimeSpan.FromMinutes(2),
-        PooledConnectionIdleTimeout = TimeSpan.FromSeconds(30),
-        ConnectTimeout = TimeSpan.FromSeconds(15),
-        SslOptions = new System.Net.Security.SslClientAuthenticationOptions
-        {
-            RemoteCertificateValidationCallback = delegate { return true; }
-        }
-    };
 
-    private static readonly HttpMessageInvoker NonRedirectingInvoker = new(NonRedirectingHandler);
 
     public async Task<IList<DebridClientTorrent>> GetDownloads()
     {
@@ -322,9 +310,13 @@ public class DeepbridDebridClient(
 
     public Task<Int32?> SelectFiles(Torrent torrent)
     {
+        if (torrent.Files.Count == 0)
+        {
+            return Task.FromResult<Int32?>(1);
+        }
+
         var files = torrent.Files.Where(f => fileFilter.IsDownloadable(torrent, f.Path, f.Bytes)).ToList();
-        var count = files.Count > 0 ? files.Count : (torrent.Files.Count > 0 ? torrent.Files.Count : 1);
-        return Task.FromResult<Int32?>(count);
+        return Task.FromResult<Int32?>(files.Count);
     }
 
     public async Task Delete(Torrent torrent)
@@ -427,7 +419,8 @@ public class DeepbridDebridClient(
         request.Headers.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
 
-        using var response = await NonRedirectingInvoker.SendAsync(request, CancellationToken.None);
+        var client = httpClientFactory.CreateClient(DiConfig.DEEPBRID_CLIENT);
+        using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, CancellationToken.None);
 
         if (response.Headers.Location != null)
         {
@@ -449,6 +442,15 @@ public class DeepbridDebridClient(
                 {
                     return resolvedUri;
                 }
+            }
+        }
+
+        if (response.RequestMessage?.RequestUri != null)
+        {
+            var finalUri = response.RequestMessage.RequestUri.ToString();
+            if (!finalUri.Contains("deepbrid.com/mytorrents", StringComparison.OrdinalIgnoreCase))
+            {
+                return finalUri;
             }
         }
 
@@ -603,15 +605,6 @@ public class DeepbridDebridClient(
             var resolvedList = await Task.WhenAll(tasks);
             links.AddRange(resolvedList.Where(d => d != null)!);
 
-            if (links.Count == 0 && validRawLinks.Count > 0)
-            {
-                links = validRawLinks.Select(l => new DownloadInfo
-                {
-                    RestrictedLink = l,
-                    FileName = null
-                }).ToList();
-            }
-
             Log($"Found {links.Count} downloadable files (out of {validRawLinks.Count} provider links) for torrent {torrent.RdName}", torrent);
             return links;
         }
@@ -622,6 +615,12 @@ public class DeepbridDebridClient(
             var links = new List<DownloadInfo>();
             foreach (var f in item.Files)
             {
+                if (!fileFilter.IsDownloadable(torrent, f.Path, f.Bytes))
+                {
+                    Log($"Excluded Deepbrid NZB file {f.Path} by filter rules", torrent);
+                    continue;
+                }
+
                 if (item.Links != null && item.Links.Count == item.Files.Count)
                 {
                     var index = item.Files.IndexOf(f);
@@ -641,11 +640,8 @@ public class DeepbridDebridClient(
                 }
             }
 
-            if (links.Count > 0)
-            {
-                Log($"Found {links.Count} files for NZB {torrent.RdName}", torrent);
-                return links;
-            }
+            Log($"Found {links.Count} files for NZB {torrent.RdName}", torrent);
+            return links;
         }
 
         if (item.Links != null && item.Links.Count > 0)

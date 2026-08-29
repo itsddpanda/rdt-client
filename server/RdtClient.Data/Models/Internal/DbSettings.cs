@@ -329,7 +329,7 @@ public class DbSettingsDefaults
 
     [DisplayName("Delete download when in error")]
     [Description("When a download has been in error for this many minutes, delete it from the provider and the client. 0 to disable.")]
-    public Int32 DeleteOnError { get; set; } = 0;
+    public Int32 DeleteOnError { get; set; } = 1;
 
     [DisplayName("Torrent maximum lifetime")]
     [Description("The maximum lifetime of a torrent in minutes. When this time has passed, mark the torrent as error. If the torrent is completed and has downloads, the lifetime setting will not apply. 0 to disable.")]

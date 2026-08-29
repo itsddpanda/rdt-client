@@ -267,7 +267,19 @@ public class DeepbridDebridClientTest
             ]
         }
         """;
-        var handler = new RecordingHttpMessageHandler(_ => JsonResponse(json));
+        var redirectUrl = "https://premium-dl.deepbrid.com/d/14648/ubuntu.iso";
+        var handler = new RecordingHttpMessageHandler(req =>
+        {
+            if (req.RequestUri!.ToString().Contains("mytorrents"))
+            {
+                return new HttpResponseMessage(HttpStatusCode.Redirect)
+                {
+                    Headers = { Location = new Uri(redirectUrl) }
+                };
+            }
+
+            return JsonResponse(json);
+        });
         var client = CreateClient(handler);
 
         var torrent = new Torrent
@@ -277,6 +289,8 @@ public class DeepbridDebridClientTest
             RdName = "ubuntu.iso"
         };
 
+        _fileFilterMock.Setup(f => f.IsDownloadable(It.IsAny<Torrent>(), It.IsAny<String>(), It.IsAny<Int64>())).Returns(true);
+
         // Act
         var infos = await client.GetDownloadInfos(torrent);
 
@@ -284,6 +298,56 @@ public class DeepbridDebridClientTest
         Assert.NotNull(infos);
         Assert.Single(infos);
         Assert.Equal("https://www.deepbrid.com/mytorrents?torrent=14648&file=ubuntu.iso", infos[0].RestrictedLink);
+    }
+
+    [Fact]
+    public async Task GetDownloadInfos_WhenAllFilesExcludedByFilter_ReturnsEmptyList()
+    {
+        // Arrange
+        var json = """
+        {
+            "error": 0,
+            "id": "14648",
+            "filename": "Lanterns 2026 S01E03 1080p HD H264-CAKES.exe",
+            "progress": 100,
+            "seeders": 12,
+            "speed": "0.00 MB/s",
+            "links": [
+                "https://www.deepbrid.com/mytorrents?torrent=14648&file=Lanterns+2026+S01E03+1080p+HD+H264-CAKES.exe"
+            ]
+        }
+        """;
+        var redirectUrl = "https://byron.myfast.link/rd/dl/torrent/a8c0394544/Lanterns+2026+S01E03+1080p+HD+H264-CAKES.exe";
+        var handler = new RecordingHttpMessageHandler(req =>
+        {
+            if (req.RequestUri!.ToString().Contains("mytorrents"))
+            {
+                return new HttpResponseMessage(HttpStatusCode.Redirect)
+                {
+                    Headers = { Location = new Uri(redirectUrl) }
+                };
+            }
+
+            return JsonResponse(json);
+        });
+        var client = CreateClient(handler);
+
+        var torrent = new Torrent
+        {
+            RdId = "14648",
+            Type = DownloadType.Torrent,
+            RdName = "Lanterns 2026 S01E03 1080p HD H264-CAKES.exe",
+            ExcludeRegex = @"\.(srt|exe|nfo|txt|jpg|png|sub|idx)$"
+        };
+
+        _fileFilterMock.Setup(f => f.IsDownloadable(It.IsAny<Torrent>(), "Lanterns 2026 S01E03 1080p HD H264-CAKES.exe", It.IsAny<Int64>())).Returns(false);
+
+        // Act
+        var infos = await client.GetDownloadInfos(torrent);
+
+        // Assert
+        Assert.NotNull(infos);
+        Assert.Empty(infos);
     }
 
     [Fact]
@@ -351,6 +415,8 @@ public class DeepbridDebridClientTest
             RdName = "My.NZB"
         };
 
+        _fileFilterMock.Setup(f => f.IsDownloadable(It.IsAny<Torrent>(), It.IsAny<String>(), It.IsAny<Int64>())).Returns(true);
+
         // Act
         var infos = await client.GetDownloadInfos(torrent);
 
@@ -359,6 +425,44 @@ public class DeepbridDebridClientTest
         Assert.Equal(2, infos.Count);
         Assert.Equal("https://premium-dl.deepbrid.com/d/file1", infos[0].RestrictedLink);
         Assert.Equal("sample.mkv", infos[0].FileName);
+    }
+
+    [Fact]
+    public async Task GetDownloadInfos_WhenNzbAllFilesExcluded_ReturnsEmptyList()
+    {
+        // Arrange
+        var json = """
+        {
+            "error": 0,
+            "id": 1024,
+            "title": "My.NZB",
+            "files": [
+                {
+                    "name": "sample.exe",
+                    "size": 104857600,
+                    "link": "https://premium-dl.deepbrid.com/d/file1.exe"
+                }
+            ]
+        }
+        """;
+        var handler = new RecordingHttpMessageHandler(_ => JsonResponse(json));
+        var client = CreateClient(handler);
+
+        var torrent = new Torrent
+        {
+            RdId = "1024",
+            Type = DownloadType.Nzb,
+            RdName = "My.NZB"
+        };
+
+        _fileFilterMock.Setup(f => f.IsDownloadable(It.IsAny<Torrent>(), It.IsAny<String>(), It.IsAny<Int64>())).Returns(false);
+
+        // Act
+        var infos = await client.GetDownloadInfos(torrent);
+
+        // Assert
+        Assert.NotNull(infos);
+        Assert.Empty(infos);
     }
 
     [Fact]
@@ -609,6 +713,33 @@ public class DeepbridDebridClientTest
 
         // Assert
         Assert.Equal(2, count);
+    }
+
+    [Fact]
+    public async Task SelectFiles_WhenAllFilesExcluded_ReturnsZero()
+    {
+        // Arrange
+        var handler = new RecordingHttpMessageHandler(_ => JsonResponse("{}"));
+        var client = CreateClient(handler);
+
+        var files = new List<DebridClientFile>
+        {
+            new() { Path = "Lanterns.exe" },
+            new() { Path = "sample.nfo" }
+        };
+
+        var torrent = new Torrent
+        {
+            RdFiles = Newtonsoft.Json.JsonConvert.SerializeObject(files)
+        };
+
+        _fileFilterMock.Setup(f => f.IsDownloadable(It.IsAny<Torrent>(), It.IsAny<String>(), It.IsAny<Int64>())).Returns(false);
+
+        // Act
+        var count = await client.SelectFiles(torrent);
+
+        // Assert
+        Assert.Equal(0, count);
     }
 
     private DeepbridDebridClient CreateClient(RecordingHttpMessageHandler handler)

@@ -338,12 +338,9 @@ public class TorrentRunner(
         // Process torrent errors
         foreach (var torrent in allTorrents.Where(m => m.Error != null && m.DeleteOnError > 0))
         {
-            if (torrent.Completed == null)
-            {
-                continue;
-            }
+            var completedTime = torrent.Completed ?? torrent.Added;
 
-            if (torrent.Completed.Value.AddMinutes(torrent.DeleteOnError) > DateTime.UtcNow)
+            if (completedTime.AddMinutes(torrent.DeleteOnError) > DateTimeOffset.UtcNow)
             {
                 continue;
             }
